@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torchvision
 import numpy as np
+import matplotlib.pyplot as plt
 
 """
 This file contains method to train and test supervised learning model.
@@ -14,7 +15,7 @@ This file contains method to train and test supervised learning model.
 __all__ = ["train"]
 
 def train(model, dataloaders, criterion, optimizer, scheduler=None,
-          num_epochs=25, device=None, verbose=1, save_wts_to=None,
+          num_epochs=25, device=None, verbose=1, plot=0, save_wts_to=None,
           save_model_to=None):
     """
     Performs a training of the model.
@@ -44,6 +45,8 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
         otherwise, cpu. (default: None)
     verbose : int
         The level of verbosity from 0 to 1. (default: 1)
+    plot : int
+        Whether to plot the loss of training and validation data. (default: 0)
     save_wts_to : str
         Name of a file to save the best model's weights. If None, then do not
         save. (default: None)
@@ -60,6 +63,10 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    # set interactive plot
+    if plot:
+        plt.ion()
+
     # load the model to the device first
     model = model.to(device)
 
@@ -67,6 +74,9 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
         since = time.time()
     best_model_weights = copy.deepcopy(model.state_dict())
     best_loss = np.inf
+
+    train_losses = []
+    val_losses = []
 
     for epoch in range(num_epochs):
         if verbose >= 1:
@@ -115,8 +125,11 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
             # get the mean loss in this epoch
             epoch_loss = running_loss / float(dataset_size)
 
-            if verbose >= 1:
-                print("%s loss: %.4f" % (phase, epoch_loss))
+            # save the losses
+            if phase == "train":
+                train_losses.append(epoch_loss)
+            elif phase == "val":
+                val_losses.append(epoch_loss)
 
             # copy the best model
             if phase == "val" and epoch_loss < best_loss:
@@ -128,6 +141,22 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
                     _save(model, save_model_to)
                 if save_wts_to is not None:
                     _save(model.state_dict(), save_wts_to)
+
+        # show the loss in the current epoch
+        if verbose >= 1:
+            print("train loss: %.4f, val loss: %.4f, done in %fs" % \
+                  (train_losses[-1], val_losses[-1], time.time()-since))
+        # plot the losses
+        if plot:
+            xs_plot = range(1,epoch+2)
+            plt.clf()
+            plt.plot(xs_plot, train_losses, 'o-')
+            plt.plot(xs_plot, val_losses, 'o-')
+            plt.legend(["Train", "Validation"])
+            plt.xlabel("Epoch")
+            plt.ylabel("Loss")
+            plt.pause(0.001)
+
         print("")
 
     if verbose >= 1:
