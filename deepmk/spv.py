@@ -1,5 +1,7 @@
 import time
 import copy
+import shutil
+import os
 import torch
 import torch.nn as nn
 import torchvision
@@ -12,7 +14,8 @@ This file contains method to train and test supervised learning model.
 __all__ = ["train"]
 
 def train(model, dataloaders, criterion, optimizer, scheduler=None,
-          num_epochs=25, device=None, verbose=1):
+          num_epochs=25, device=None, verbose=1, save_wts_to=None,
+          save_model_to=None):
     """
     Performs a training of the model.
 
@@ -41,6 +44,12 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
         otherwise, cpu. (default: None)
     verbose : int
         The level of verbosity from 0 to 1. (default: 1)
+    save_wts_to : str
+        Name of a file to save the best model's weights. If None, then do not
+        save. (default: None)
+    save_model_to : str
+        Name of a file to save the best whole model. If None, then do not save.
+        (default: None)
 
     Returns
     -------
@@ -113,6 +122,12 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
             if phase == "val" and epoch_loss < best_loss:
                 best_loss = epoch_loss
                 best_model_weights = copy.deepcopy(model.state_dict())
+
+                # save the model
+                if save_model_to is not None:
+                    _save(model, save_model_to)
+                if save_wts_to is not None:
+                    _save(model.state_dict(), save_wts_to)
         print("")
 
     if verbose >= 1:
@@ -123,3 +138,14 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
     # load the best model
     model.load_state_dict(best_model_weights)
     return model
+
+def _save(obj, fpath):
+    torch.save(obj, fpath+".temp")
+    try:
+        os.rename(fpath+".temp", fpath)
+    except OSError:
+        if os.path.isfile(fpath):
+            os.remove(fpath)
+        if os.path.isdir(fpath):
+            shutil.rmtree(fpath)
+        os.rename(fpath+".temp", fpath)
