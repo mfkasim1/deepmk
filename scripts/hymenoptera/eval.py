@@ -52,7 +52,7 @@ for param in model_ft.parameters():
 num_ftrs = model_ft.fc.in_features
 model_ft.fc = nn.Linear(num_ftrs, 2)
 
-# cross entropy loss for 2 classes classifications
+# cross entropy loss for multi classes classifications
 criterion = nn.CrossEntropyLoss()
 
 optimizer_ft = optim.SGD(model_ft.fc.parameters(), lr=0.001, momentum=0.9)
