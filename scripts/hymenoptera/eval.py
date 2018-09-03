@@ -1,3 +1,7 @@
+"""
+This is modified file from PyTorch tutorial to take the advantage of deepmk.
+"""
+
 import time
 import os
 import copy
