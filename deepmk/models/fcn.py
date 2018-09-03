@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 from torchvision import models
 
+"""
+Fully Convolutional Network for Semantic Segmentation
+J. Long, E. Shelhamer, T. Darrell (2015)
+"""
+
 __all__ = ["fcn8", "fcn16", "fcn32"]
 
 class FCNConv(torch.nn.Module):
@@ -41,23 +46,29 @@ def repsample(x, n): # only works for the power of 2s
         return y
 
 class fcn32(torch.nn.Module):
-    def __init__(self, n_class):
+    def __init__(self, n_class, channels=None, p_dropout=0.5):
         super(fcn32, self).__init__()
+
+        if channels is None:
+            # set the default channels
+            channels = [3, 16, 32, 64, 128, 256, 512, 1024]
+            # channels = [3, 64, 128, 256, 512, 1024, 2048, 4096]
+
         # convolutional network
-        self.conv1 = FCNConv(2, 3, 64)
+        self.conv1 = FCNConv(2, channels[0], channels[1])
         self.pool1 = FCNPool()
-        self.conv2 = FCNConv(2, 64, 128)
+        self.conv2 = FCNConv(2, channels[1], channels[2])
         self.pool2 = FCNPool()
-        self.conv3 = FCNConv(3, 128, 256)
+        self.conv3 = FCNConv(3, channels[2], channels[3])
         self.pool3 = FCNPool()
-        self.conv4 = FCNConv(3, 256, 512)
+        self.conv4 = FCNConv(3, channels[3], channels[4])
         self.pool4 = FCNPool()
-        self.conv5 = FCNConv(3, 512, 1024)
+        self.conv5 = FCNConv(3, channels[4], channels[5])
         self.pool5 = FCNPool()
-        self.conv6 = FCNConv(1, 1024, 2048)
-        self.drop6 = nn.Dropout2d()
-        self.conv7 = FCNConv(1, 2048, 4096)
-        self.drop7 = nn.Dropout2d()
+        self.conv6 = FCNConv(1, channels[5], channels[6])
+        self.drop6 = nn.Dropout2d(p=p_dropout)
+        self.conv7 = FCNConv(1, channels[6], channels[7])
+        self.drop7 = nn.Dropout2d(p=p_dropout)
 
         # upsample layers
         self.upsample32 = FCNUpsample(self.conv7.out_channel, n_class, 32)
