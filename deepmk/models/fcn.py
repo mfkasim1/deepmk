@@ -79,7 +79,7 @@ class fcn32(torch.nn.Module):
             n_class, 8)
 
         # softmax class
-        self.softmax = nn.Softmax2d()
+        self.softmax2d = nn.Softmax2d()
 
     def forward(self, inp):
         conv1 = self.conv1(inp)
@@ -98,7 +98,8 @@ class fcn32(torch.nn.Module):
         conv7 = self.conv7(drop6)
         drop7 = self.drop7(conv7)
 
-        res = self.upsample32(drop7)
+        h = self.upsample32(drop7)
+        res = self.softmax2d(h)
         return res
 
 class fcn16(fcn32):
@@ -122,7 +123,8 @@ class fcn16(fcn32):
         # get the input to upsample
         drop7_2x = repsample(drop7, 2)
         h = torch.cat((pool4, drop7_2x), dim=1)
-        res = self.upsample16(h)
+        h = self.upsample16(h)
+        res = self.softmax2d(h)
         return res
 
 class fcn8(fcn32):
@@ -147,5 +149,6 @@ class fcn8(fcn32):
         drop7_4x = repsample(drop7, 4)
         pool4_2x = repsample(pool4, 2)
         h = torch.cat((pool3, pool4_2x, drop7_4x), dim=1)
-        res = self.upsample8(h)
+        h = self.upsample8(h)
+        res = self.softmax2d(h)
         return res
