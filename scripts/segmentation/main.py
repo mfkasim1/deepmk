@@ -18,13 +18,17 @@ name = "01-coco"
 coco_both_transform = transforms.Compose([
     mktransforms.RandomCropTensor(320, pad_if_needed=True)
 ])
+coco_img_transform = transforms.Compose([
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
 fdir = os.path.dirname(os.path.abspath(__file__))
 coco_dir = os.path.join(fdir, "..", "..", "dataset", "coco")
 # get the coco dataset
 coco = {
     x: mkdatasets.CocoDetection(os.path.join(coco_dir, "%s2017"%x),
         os.path.join(coco_dir, "annotations", ("instances_%s2017.json"%x)),
-        both_transform=coco_both_transform)
+        both_transform=coco_both_transform,
+        img_transform=coco_img_transform)
     for x in ["train", "val"]
 }
 # dataloader
