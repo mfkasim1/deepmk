@@ -172,9 +172,9 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
 
                 # save the model
                 if save_model_to is not None:
-                    _save(model, save_model_to)
+                    mkutils.save(model, save_model_to)
                 if save_wts_to is not None:
-                    _save(model.state_dict(), save_wts_to)
+                    mkutils.save(model.state_dict(), save_wts_to)
 
         # show the loss in the current epoch
         if verbose >= 1:
@@ -201,14 +201,3 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
     # load the best model
     model.load_state_dict(best_model_weights)
     return model
-
-def _save(obj, fpath):
-    torch.save(obj, fpath+".temp")
-    try:
-        os.rename(fpath+".temp", fpath)
-    except OSError:
-        if os.path.isfile(fpath):
-            os.remove(fpath)
-        if os.path.isdir(fpath):
-            shutil.rmtree(fpath)
-        os.rename(fpath+".temp", fpath)
