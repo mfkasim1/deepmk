@@ -29,7 +29,7 @@ coco = {
 }
 # dataloader
 dataloader = {
-    x: DataLoader(coco[x], batch_size=64, shuffle=True, num_workers=16)
+    x: DataLoader(coco[x], batch_size=16, shuffle=True, num_workers=16)
     for x in ["train", "val"]
 }
 
