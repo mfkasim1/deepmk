@@ -8,8 +8,9 @@ This file contains method to train and test reinforcement learning model.
 
 __all__ = ["train"]
 
-def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss, scheduler=None,
-          num_episodes=1000, val_every=20, val_episodes=10, verbose=1, plot=0,
+def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
+          reward_preproc=lambda x:x, scheduler=None, num_episodes=1000,
+          val_every=20, val_episodes=10, verbose=1, plot=0,
           save_wts_to=None, save_model_to=None):
 
     """
@@ -32,6 +33,8 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss, scheduler=N
             Receives the prediction of the "outputs" as the first argument, and
             the ground truth of the "outputs" as the second argument. It returns
             the loss function to be minimized. (default: torch.nn.MSELoss)
+        reward_preproc (function) :
+            Reward preprocessor. (default: lambda x:x)
         scheduler (torch.optim.lr_scheduler object):
             Scheduler of how the learning rate is evolving through the epochs.
             If it is None, it does not update the learning rate. (default: None)
@@ -95,6 +98,7 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss, scheduler=N
 
                 # act! and observe the state and reward
                 next_state, reward, episode_done, _ = env.step(action)
+                reward = reward_preproc(reward)
                 score += reward
                 if episode_done: next_state = None
 
