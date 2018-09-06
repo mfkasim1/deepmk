@@ -66,4 +66,4 @@ exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
 # train the model
 model_ft = deepmk.spv.train(model_ft, dataloaders, criterion, optimizer_ft,
-    scheduler=exp_lr_scheduler, num_epochs=25, plot=1)
+    scheduler=exp_lr_scheduler, num_epochs=25, plot=0, verbose=2)

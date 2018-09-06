@@ -78,12 +78,16 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
     train_losses = []
     val_losses = []
 
+    total_batches = len(dataloaders["train"]) + len(dataloaders["val"])
     for epoch in range(num_epochs):
         if verbose >= 1:
             print("Epoch %d/%d" % (epoch+1, num_epochs))
             print("-"*10)
 
         # every epoch has a training and a validation phase
+        num_batches = 0 # num batches in training and validation
+        if verbose >= 2:
+            progress_printed = False
         for phase in ["train", "val"]:
             if phase == "train":
                 if scheduler is not None:
@@ -97,9 +101,22 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
 
             # iterate over the data
             dataset_size = 0
+
             for inputs, labels in dataloaders[phase]:
                 # get the size of the dataset
                 dataset_size += inputs.size(0)
+                num_batches += 1
+
+                if verbose >= 2:
+                    if progress_printed:
+                        print("\033[F" + (" "*100) + "\033[F")
+                    progress = num_batches * 1. / total_batches
+                    len_progress_bar = 20
+                    progress_str = "=" * (int(progress*len_progress_bar))
+                    progress_str += " " * (len_progress_bar - len(progress_str))
+                    print("Progress: [%s] %8d/%8d" % \
+                          (progress_str, num_batches, total_batches))
+                    progress_printed = True
 
                 # load the inputs and the labels to the working device
                 inputs = inputs.to(device)
