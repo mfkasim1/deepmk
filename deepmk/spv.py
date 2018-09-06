@@ -21,44 +21,42 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
     """
     Performs a training of the model.
 
-    Parameters
-    ----------
-    model :
-        A torch trainable class method that accepts "inputs" and returns
-        prediction of "outputs".
-    dataloaders : dict
-        Dictionary with two keys: ["train", "val"] with every value is an
-        iterable with two outputs: (1) the "inputs" to the model and (2) the
-        ground truth of the "outputs".
-    criterion : function or evaluable class
-        Receives the prediction of the "outputs" as the first argument, and
-        the ground truth of the "outputs" as the second argument. It returns
-        the loss function to be minimized.
-    optimizer : torch.optim optimizer
-        Optimizer class in training the model.
-    scheduler : torch.optim.lr_scheduler object
-        Scheduler of how the learning rate is evolving through the epochs. If it
-        is None, it does not update the learning rate. (default: None)
-    num_epochs : int
-        The number of epochs in training. (default: 25)
-    device :
-        Device where to do the training. None to choose cuda:0 if available,
-        otherwise, cpu. (default: None)
-    verbose : int
-        The level of verbosity from 0 to 1. (default: 1)
-    plot : int
-        Whether to plot the loss of training and validation data. (default: 0)
-    save_wts_to : str
-        Name of a file to save the best model's weights. If None, then do not
-        save. (default: None)
-    save_model_to : str
-        Name of a file to save the best whole model. If None, then do not save.
-        (default: None)
+    Args:
+        model :
+            A torch trainable class method that accepts "inputs" and returns
+            prediction of "outputs".
+        dataloaders (dict):
+            Dictionary with two keys: ["train", "val"] with every value is an
+            iterable with two outputs: (1) the "inputs" to the model and (2) the
+            ground truth of the "outputs".
+        criterion (function or evaluable class):
+            Receives the prediction of the "outputs" as the first argument, and
+            the ground truth of the "outputs" as the second argument. It returns
+            the loss function to be minimized.
+        optimizer (torch.optim optimizer):
+            Optimizer class in training the model.
+        scheduler (torch.optim.lr_scheduler object):
+            Scheduler of how the learning rate is evolving through the epochs. If it
+            is None, it does not update the learning rate. (default: None)
+        num_epochs (int):
+            The number of epochs in training. (default: 25)
+        device :
+            Device where to do the training. None to choose cuda:0 if available,
+            otherwise, cpu. (default: None)
+        verbose (int):
+            The level of verbosity from 0 to 1. (default: 1)
+        plot (int):
+            Whether to plot the loss of training and validation data. (default: 0)
+        save_wts_to (str):
+            Name of a file to save the best model's weights. If None, then do not
+            save. (default: None)
+        save_model_to (str):
+            Name of a file to save the best whole model. If None, then do not save.
+            (default: None)
 
-    Returns
-    -------
-    best_model :
-        The trained model with the lowest loss criterion during "val" phase
+    Returns:
+        best_model :
+            The trained model with the lowest loss criterion during "val" phase
     """
     # get the device
     if device is None:
