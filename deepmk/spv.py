@@ -7,6 +7,7 @@ import torch.nn as nn
 import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
+import deepmk.utils as mkutils
 
 """
 This file contains method to train and test supervised learning model.
@@ -84,10 +85,14 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
             print("Epoch %d/%d" % (epoch+1, num_epochs))
             print("-"*10)
 
-        # every epoch has a training and a validation phase
+        # to time the progress
+        epoch_start_time = time.time()
+
+        # progress counter
         num_batches = 0 # num batches in training and validation
-        if verbose >= 2:
-            progress_printed = False
+        if verbose >= 2: progress_printed = False
+
+        # every epoch has a training and a validation phase
         for phase in ["train", "val"]:
             if phase == "train":
                 if scheduler is not None:
@@ -107,15 +112,29 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
                 dataset_size += inputs.size(0)
                 num_batches += 1
 
+                # write the progress bar
                 if verbose >= 2:
+                    # delete the row
                     if progress_printed:
-                        print("\033[F" + (" "*100) + "\033[F")
+                        print("\033[F" + (" "*1) + "\033[F")
+
+                    # get the progress bar
                     progress = num_batches * 1. / total_batches
                     len_progress_bar = 20
                     progress_str = "=" * (int(progress*len_progress_bar))
                     progress_str += " " * (len_progress_bar - len(progress_str))
-                    print("Progress: [%s] %8d/%8d" % \
-                          (progress_str, num_batches, total_batches))
+
+                    # estimated time
+                    elapsed_time = time.time() - epoch_start_time
+                    remaining_time = elapsed_time / progress * (1. - progress)
+
+                    # print the progress
+                    print("Progress: [%s] %8d/%8d. " \
+                          "Elapsed time: %s. "\
+                          "Estimated remaining time: %s" % \
+                          (progress_str, num_batches, total_batches,
+                          mkutils.to_time_str(elapsed_time),
+                          mkutils.to_time_str(remaining_time)))
                     progress_printed = True
 
                 # load the inputs and the labels to the working device
