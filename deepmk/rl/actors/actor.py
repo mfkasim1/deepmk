@@ -1,5 +1,7 @@
 from abc import ABCMeta, abstractmethod
 
+__all__ = ["Actor"]
+
 class Actor:
     __metaclass__ = ABCMeta
 

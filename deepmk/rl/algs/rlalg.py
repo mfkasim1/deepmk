@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-import torch.utils.data.Dataset as Dataset
+from torch.utils.data import Dataset
 
 class RLAlg:
     __metaclass__ = ABCMeta
@@ -59,12 +59,24 @@ class RLTupleDataset(Dataset):
     Args:
         list_of_rl_tuple (list): List of RLTuple to be formed as a dataset.
     """
-    def __init__(self, list_of_rl_tuple):
+    def __init__(self, list_of_rl_tuple, state_transform=None,
+                 target_transform=None):
         self.data = list_of_rl_tuple
+        self.state_transform = state_transform
+        self.target_transform = target_transform
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, i):
         tup = self.data[i]
-        return (tup.s, tup.get_value())
+        state = tup.s
+        target = tup.get_value()
+
+        # apply transforms
+        if self.state_transform is not None:
+            state = self.state_transform(state)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return (state, target)

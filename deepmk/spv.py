@@ -69,7 +69,7 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
 
     # check if the dataloader is for validation as well
     if type(dataloaders) != dict:
-        dataloaders = {"train": dataloaders, "val": None}
+        dataloaders = {"train": dataloaders, "val": []}
 
     # load the model to the device first
     model = model.to(device)
@@ -97,8 +97,8 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
 
         # every epoch has a training and a validation phase
         for phase in ["train", "val"]:
-            # skip phase if the dataloaders for the current phase is None
-            if dataloaders[phase] is None: continue
+            # skip phase if the dataloaders for the current phase is empty
+            if dataloaders[phase] == []: continue
 
             if phase == "train":
                 if scheduler is not None:

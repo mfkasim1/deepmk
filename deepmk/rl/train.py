@@ -1,6 +1,9 @@
+import time
+import copy
+import numpy as np
 import torch
 import torch.nn as nn
-import deepmk.spv
+import deepmk.spv as spv
 
 """
 This file contains method to train and test reinforcement learning model.
@@ -60,10 +63,6 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
         best_model :
             The trained model with the best criterion during "val" phase.
     """
-    # get the device
-    if device is None:
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
     # set interactive plot
     if plot:
         plt.ion()
@@ -107,6 +106,7 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
 
                 # get the dataloader to train the model
                 dataloader = rlalg.step(state, action, reward, next_state)
+                if dataloader is None: continue
                 spv.train(model, dataloader, criterion, optimizer,
                     num_epochs=1, verbose=0, plot=0)
 

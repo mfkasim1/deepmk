@@ -1,11 +1,13 @@
 import torch
-from deepmk.rl.actors.rlactor import RLActor
+from deepmk.rl.actors import Actor
 
 """
 Actors with a single model.
 """
 
-class RLActorGreedy(RLActor):
+__all__ = ["GreedyActor", "PolicyActor"]
+
+class GreedyActor(Actor):
     """
     Go to the state that has the largest value of Q(s,a) given by the model.
     The model must receive an input of a state and output the values of the
@@ -31,10 +33,11 @@ class RLActorGreedy(RLActor):
             int :
                 The action in terms of the index.
         """
+        state = torch.FloatTensor(state)
         out = self.model.forward(state.unsqueeze(dim=0)).argmax(dim=-1)[0]
         return int(out)
 
-class RLActorPolicy(RLActor):
+class PolicyActor(Actor):
     """
     The model in this actor outputs the probability of the action and the action
     is taken by randomly choose based on the given probability.

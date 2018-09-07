@@ -1,4 +1,4 @@
-import torch.utils.data.DataLoader as DataLoader
+from torch.utils.data import DataLoader
 from deepmk.rl.algs.rlalg import RLAlg, RLTuple, RLTupleDataset
 
 __all__ = ["MonteCarloRL"]
@@ -10,11 +10,19 @@ class MonteCarloRL(RLAlg):
     of the episode.
 
     Args:
-        dataloader_kwargs (dict): The keyword arguments for
-            torch.utils.data.DataLoader (default: {})
+        dataloader_kwargs (dict) : The keyword arguments for
+            torch.utils.data.DataLoader (default: {}).
+        state_transform (callable) : Transformation applied to the state before
+            being presented (default: None).
+        target_transform (callable) : Transformation applied to the target
+            before being presented (default: None).
     """
-    def __init__(self, dataloader_kwargs={}):
+    def __init__(self, dataloader_kwargs={}, state_transform=None,
+                 target_transform=None):
         self.episode = []
+        self.dataloader_kwargs = dataloader_kwargs
+        self.state_transform = state_transform
+        self.target_transform = target_transform
 
     def step(self, s, a, r, snext=None):
         # save the tuple
@@ -32,6 +40,8 @@ class MonteCarloRL(RLAlg):
 
         # construct a dataloader to be returned
         # the dataset should contains all the transitions in the episode
-        dataset = RLTupleDataset(self.episode)
-        dataloader = DataLoader(dataset, **dataloader_kwargs)
+        dataset = RLTupleDataset(self.episode,
+            state_transform=self.state_transform,
+            target_transform=self.target_transform)
+        dataloader = DataLoader(dataset, **self.dataloader_kwargs)
         return dataloader
