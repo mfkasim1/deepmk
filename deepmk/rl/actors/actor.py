@@ -8,7 +8,15 @@ class Actor:
     @abstractmethod
     def __call__(self, state):
         """
-        Returns an action given a state
+        Get the recommended action by taking the action randomly according to
+        the probability given by the model.
+
+        Args:
+            state :
+                The current state.
+        Returns:
+            int :
+                The action in terms of the index.
         """
         pass
 

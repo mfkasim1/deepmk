@@ -1,17 +1,13 @@
 import torch
 from deepmk.rl.actors import Actor
 
-"""
-Actors with a single model.
-"""
-
-__all__ = ["QNet", "PolicyActor"]
+__all__ = ["QNet"]
 
 class QNet(Actor):
     """
-    Go to the state that has the largest value of Q(s,a) given by the model.
-    The model must receive an input of a state and output the values of the
-    next state per action.
+    Actor that picks an action, a, which maximizes the value of Q(s,a;t) given
+    a state, s, and the model's parameters, t. Training of the model minimizes
+    (Q(s,a;t) - val(s,a))^2.
 
     Args:
         model :
