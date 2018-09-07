@@ -33,7 +33,17 @@ class QNet(Actor):
         out = self.model.forward(state.unsqueeze(dim=0)).argmax(dim=-1)[0]
         return int(out)
 
-    def value(self, states, actions, rewards, next_states, vals):
-        pred_vals = self.model.forward(states).gather(dim=-1, index=actions)
-        loss = (vals - pred_vals).square()
-        return loss
+    def value(self, states, actions, rewards, next_states, done, vals):
+        # the current state's predicted value
+        pred_vals = self.model.forward(states)\
+                    .gather(dim=-1, index=actions.unsqueeze(-1))
+
+        # the next state's predicted value
+        next_vals = self.model.forward(next_states.float()).max(dim=-1)[0]*self.gamma
+        # zeroing out the end of episode
+        next_vals = next_vals * (1.-done.float())
+        # the target value
+        target_vals = next_vals + rewards.float()
+        # target_vals = vals.float()
+        loss = (target_vals.data - pred_vals)**2
+        return loss.mean()

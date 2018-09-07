@@ -5,7 +5,7 @@ class RLAlg:
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def step(self, s, a, r, snext=None):
+    def step(self, s, a, r, snext, done):
         """
         Gather the information of the step, update the database, and return
         DataLoader for a training.
@@ -14,11 +14,14 @@ class RLAlg:
             s: The initial state.
             a: The action taken.
             r: The reward given in this transition.
-            snext: The next state of the transition. None if the episode ends.
+            snext: The next state of the transition.
+            done: True if the episode ends.
 
         Returns:
             torch.utils.data.DataLoader or None: DataLoader for the training or
-                None. If None, no training will take place.
+                None. If None, no training will take place. The DataLoader
+                should returns tuple of (states, actions, rewards, next_states,
+                values).
         """
         pass
 
@@ -31,19 +34,22 @@ class RLTuple:
         s: The initial state.
         a: The action taken.
         r: The reward given in this transition.
-        snext: The next state of the transition. None if the episode ends.
+        snext: The next state of the transition.
+        done: True if the episode ends.
 
     Attributes:
         s: The initial state.
         a: The action taken.
         r: The reward given in this transition.
-        snext: The next state of the transition. None if the episode ends.
+        snext: The next state of the transition.
+        done: True if the episode ends.
     """
-    def __init__(self, s, a, r, snext):
+    def __init__(self, s, a, r, snext, done):
         self.s = s
         self.a = a
         self.r = r
         self.snext = snext
+        self.done = done
 
     def set_value(self, value):
         self.val = value
@@ -79,4 +85,5 @@ class RLTupleDataset(Dataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return (state, target)
+        return (state, tup.a, tup.r, tup.snext, tup.done, \
+                target)

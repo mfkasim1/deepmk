@@ -34,7 +34,7 @@ class Policy(Actor):
         prob = prob / prob.sum() # normalize the probability
         return np.choice(np.linspace(len(prob)), p=prob)
 
-    def value(self, states, actions, rewards, next_states, vals):
+    def value(self, states, actions, rewards, next_states, done, vals):
         pi = self.model.forward(states).gather(dim=-1, index=actions)
         log_pi = torch.log(pi)
         wlog_pi = log_pi # * ???

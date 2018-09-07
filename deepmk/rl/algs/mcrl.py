@@ -24,12 +24,13 @@ class MonteCarloRL(RLAlg):
         self.state_transform = state_transform
         self.target_transform = target_transform
 
-    def step(self, s, a, r, snext=None):
+    def step(self, s, a, r, snext, done):
         # save the tuple
-        self.episode.append(RLTuple(s, a, r, snext))
+        self.episode.append(RLTuple(s, a, r, snext, done))
 
-        # if not the end of an episode, then return None (i.e. no training)
-        if snext is not None: return None
+        # if not the end of an episode, then return None
+        # (i.e. no training)
+        if not done: return None
 
         # end of an episode, calculate the value of each state
         value = 0
@@ -40,8 +41,14 @@ class MonteCarloRL(RLAlg):
 
         # construct a dataloader to be returned
         # the dataset should contains all the transitions in the episode
-        dataset = RLTupleDataset(self.episode,
+        dset = self.episode[:]
+        dataset = RLTupleDataset(dset,
             state_transform=self.state_transform,
             target_transform=self.target_transform)
-        dataloader = DataLoader(dataset, **self.dataloader_kwargs)
+        dataloader = DataLoader(dataset,
+            **self.dataloader_kwargs)
+
+        # clear the episode memory
+        self.episode = []
+
         return dataloader
