@@ -25,10 +25,11 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
         model :
             A torch trainable class method that accepts "inputs" and returns
             prediction of "outputs".
-        dataloaders (dict):
+        dataloaders (dict or torch.utils.data.DataLoader):
             Dictionary with two keys: ["train", "val"] with every value is an
             iterable with two outputs: (1) the "inputs" to the model and (2) the
-            ground truth of the "outputs".
+            ground truth of the "outputs". If it is a DataLoader, then it's only
+            for the training, nothing for validation.
         criterion (function or evaluable class):
             Receives the prediction of the "outputs" as the first argument, and
             the ground truth of the "outputs" as the second argument. It returns
@@ -66,6 +67,10 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
     if plot:
         plt.ion()
 
+    # check if the dataloader is for validation as well
+    if type(dataloaders) != dict:
+        dataloaders = {"train": dataloaders, "val": None}
+
     # load the model to the device first
     model = model.to(device)
 
@@ -92,6 +97,9 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
 
         # every epoch has a training and a validation phase
         for phase in ["train", "val"]:
+            # skip phase if the dataloaders for the current phase is None
+            if dataloaders[phase] is None: continue
+
             if phase == "train":
                 if scheduler is not None:
                     scheduler.step() # adjust the training learning rate
