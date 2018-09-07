@@ -87,6 +87,9 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
         nepisodes = 1 if phase == "train" else val_episodes
         score = 0
         for i in range(nepisodes):
+            # apply the scheduler in training phase per episode
+            if phase == "train": scheduler.step()
+
             # starts for an episode
             state = env.reset()
             episode_done = False
@@ -104,7 +107,7 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
 
                 # get the dataloader to train the model
                 dataloader = rlalg.step(state, action, reward, next_state)
-                spv.train(model, dataloader, criterion, optimizer, scheduler,
+                spv.train(model, dataloader, criterion, optimizer,
                     num_epochs=1, verbose=0, plot=0)
 
         # get the average score
