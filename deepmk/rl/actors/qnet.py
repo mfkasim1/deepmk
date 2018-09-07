@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from deepmk.rl.actors import Actor
 
@@ -14,8 +15,10 @@ class QNet(Actor):
             A torch trainable class method that accepts state(s) and returns
             list prediction(s) of the next state values.
     """
-    def __init__(self, model):
+    def __init__(self, model, gamma=0.9, epsilon=0.1):
         self.model = model
+        self.gamma = gamma
+        self.epsilon = epsilon
 
     def __call__(self, state):
         """
@@ -30,8 +33,13 @@ class QNet(Actor):
                 The action in terms of the index.
         """
         state = torch.FloatTensor(state)
-        out = self.model.forward(state.unsqueeze(dim=0)).argmax(dim=-1)[0]
-        return int(out)
+        out = self.model.forward(state.unsqueeze(dim=0))
+        action_suggest = int(out.argmax(dim=-1)[0])
+
+        # random action with self.epsilon probability
+        rand = np.random.random() < self.epsilon
+        action = np.random.randint(out.shape[-1]) if rand else action_suggest
+        return action
 
     def value(self, states, actions, rewards, next_states, done, vals):
         # the current state's predicted value

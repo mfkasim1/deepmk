@@ -1,9 +1,11 @@
 import time
 import copy
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import deepmk.spv as spv
+import deepmk.utils as mkutils
 
 """
 This file contains method to train and test reinforcement learning model.
@@ -11,7 +13,7 @@ This file contains method to train and test reinforcement learning model.
 
 __all__ = ["train"]
 
-def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
+def train(env, rlalg, model, actor, optimizer,
           reward_preproc=lambda x:x, scheduler=None, num_episodes=1000,
           val_every=20, val_episodes=10, verbose=1, plot=0,
           save_wts_to=None, save_model_to=None):
@@ -32,10 +34,6 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
             recommendation.
         optimizer (torch.optim optimizer) :
             Optimizer class in training the model.
-        criterion (function or evaluable class) :
-            Receives the prediction of the "outputs" as the first argument, and
-            the ground truth of the "outputs" as the second argument. It returns
-            the loss function to be minimized. (default: torch.nn.MSELoss)
         reward_preproc (function) :
             Reward preprocessor. (default: lambda x:x)
         scheduler (torch.optim.lr_scheduler object):
@@ -87,7 +85,8 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
         score = 0
         for i in range(nepisodes):
             # apply the scheduler in training phase per episode
-            if phase == "train": scheduler.step()
+            if phase == "train" and scheduler is not None:
+                scheduler.step()
 
             # starts for an episode
             state = env.reset()
@@ -102,19 +101,33 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
                 next_state, reward, episode_done, _ = env.step(action)
                 reward = reward_preproc(reward)
                 score += reward
-                if episode_done: next_state = None
 
                 # get the dataloader to train the model
-                dataloader = rlalg.step(state, action, reward, next_state)
-                if dataloader is None: continue
-                spv.train(model, dataloader, criterion, optimizer,
-                    num_epochs=1, verbose=0, plot=0)
+                dataloader = rlalg.step(state, action, \
+                    reward, next_state, episode_done)
+
+                # update the state to the next state
+                state = next_state
+
+                # skip training if no dataloader or not in
+                # training phase
+                if dataloader is None or phase != "train":
+                    continue
+                # train the model
+                for tup in dataloader:
+                    optimizer.zero_grad()
+                    loss = actor.value(*tup)
+                    loss.backward()
+                    optimizer.step()
 
         # get the average score
         avg_score = score * 1. / nepisodes
 
         if phase == "val":
             val_scores.append(avg_score)
+
+            for name, param in model.named_parameters():
+                if param.requires_grad: print name, param.data
 
             # print the progress
             if verbose >= 1:
@@ -140,8 +153,6 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
             plt.xlabel("Episode")
             plt.ylabel("Scores")
             plt.pause(0.001)
-
-        print("")
 
     if verbose >= 1:
         time_elapsed = time.time() - since
