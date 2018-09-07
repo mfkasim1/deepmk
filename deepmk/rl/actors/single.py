@@ -1,5 +1,5 @@
 import torch
-from .rlactor import RLActor
+from deepmk.rl.actors.rlactor import RLActor
 
 """
 Actors with a single model.

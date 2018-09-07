@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
-class RLActor:
+class Actor:
     __metaclass__ = ABCMeta
 
     @abstractmethod

@@ -19,7 +19,7 @@ def train(env, rlalg, model, actor, optimizer, criterion=nn.MSELoss,
     Args:
         env :
             The RL environment, equivalent to OpenAI gym.
-        rlalg (deepmk.rlalg.RLAlg) :
+        rlalg (deepmk.rl.algs.RLAlg) :
             The RL algorithm object that returns a dataloader every step.
         model :
             A torch trainable class method that accepts "inputs" and returns

@@ -1,5 +1,5 @@
 import torch.utils.data.DataLoader as DataLoader
-from .rlalg import RLAlg, RLTuple, RLTupleDataset
+from deepmk.rl.algs.rlalg import RLAlg, RLTuple, RLTupleDataset
 
 __all__ = ["MonteCarloRL"]
 
