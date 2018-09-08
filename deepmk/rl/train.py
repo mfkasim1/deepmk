@@ -11,7 +11,7 @@ import deepmk.utils as mkutils
 This file contains method to train and test reinforcement learning model.
 """
 
-__all__ = ["train"]
+__all__ = ["train", "show"]
 
 def train(env, rlalg, model, actor, optimizer,
           reward_preproc=lambda x:x, scheduler=None, num_episodes=1000,
@@ -162,3 +162,23 @@ def train(env, rlalg, model, actor, optimizer,
     # load the best model
     model.load_state_dict(best_model_weights)
     return model
+
+def show(env, model, actor, load_wts_from=None,
+         load_model_from=None):
+    # load the model
+    if load_model_from is not None:
+        model = torch.load(load_model_from)
+    elif load_wts_from is not None:
+        model.load_state_dict(torch.load(load_wts_from))
+
+    # play the episode
+    while True:
+        obs = env.reset()
+        done = False
+        score = 0
+        while not done:
+            env.render()
+            action = actor(obs)
+            obs, reward, done, _ = env.step(action)
+            score += reward
+        print("Score: %f" % score)

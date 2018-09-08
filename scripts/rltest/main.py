@@ -6,7 +6,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from deepmk.rl.algs import MonteCarloRL
 from deepmk.rl.actors import QNet
-from deepmk.rl import train
+from deepmk.rl import train, show
 
 # set up the training components
 env = gym.make("CartPole-v0")
@@ -29,3 +29,5 @@ model = train(env, rlalg, model, actor, optimizer,
           reward_preproc=lambda x:x, scheduler=None, num_episodes=10000,
           val_every=20, val_episodes=10, verbose=1, plot=1,
           save_wts_to="cartpole.pkl", save_model_to=None)
+
+# show(env, model, actor, load_wts_from="cartpole.pkl")
