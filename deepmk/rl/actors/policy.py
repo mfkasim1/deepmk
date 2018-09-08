@@ -18,7 +18,7 @@ class Policy(Actor):
     def __init__(self, model):
         self.model = model
 
-    def __call__(self, state):
+    def getaction(self, state):
         """
         Get the recommended action by taking the action randomly according to
         the probability given by the model.

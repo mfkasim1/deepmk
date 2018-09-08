@@ -95,7 +95,7 @@ def train(env, rlalg, model, actor, optimizer,
             # iterate until the episode finishes
             while not episode_done:
                 # get the next action
-                action = actor(state)
+                action = actor.getaction(state)
 
                 # act! and observe the state and reward
                 next_state, reward, episode_done, _ = env.step(action)

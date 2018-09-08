@@ -20,7 +20,7 @@ class QNet(Actor):
         self.gamma = gamma
         self.epsilon = epsilon
 
-    def __call__(self, state):
+    def getaction(self, state):
         """
         Get the recommended action by taking the action with the largest value
         given by the model.
