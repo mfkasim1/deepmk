@@ -13,7 +13,7 @@ This file contains method to train and test reinforcement learning model.
 
 __all__ = ["train", "show"]
 
-def train(env, rlalg, model, actor, optimizer,
+def train(env, trainer, model, actor, optimizer,
           reward_preproc=lambda x:x, scheduler=None, num_episodes=1000,
           val_every=20, val_episodes=10, verbose=1, plot=0,
           save_wts_to=None, save_model_to=None):
@@ -24,8 +24,9 @@ def train(env, rlalg, model, actor, optimizer,
     Args:
         env :
             The RL environment, equivalent to OpenAI gym.
-        rlalg (deepmk.rl.algs.RLAlg) :
-            The RL algorithm object that returns a dataloader every step.
+        trainer (deepmk.rl.trainers.Trainer) :
+            The RL algorithm object that do the training
+            every step and/or episode.
         model :
             A torch trainable class method that accepts "inputs" and returns
             prediction of "outputs".
@@ -103,22 +104,12 @@ def train(env, rlalg, model, actor, optimizer,
                 score += reward
 
                 # get the dataloader to train the model
-                dataloader = rlalg.step(state, action, \
-                    reward, next_state, episode_done)
+                dataloader = trainer.trainstep(state, \
+                    action, reward, next_state, \
+                    episode_done)
 
                 # update the state to the next state
                 state = next_state
-
-                # skip training if no dataloader or not in
-                # training phase
-                if dataloader is None or phase != "train":
-                    continue
-                # train the model
-                for tup in dataloader:
-                    optimizer.zero_grad()
-                    loss = actor.value(*tup)
-                    loss.backward()
-                    optimizer.step()
 
         # get the average score
         avg_score = score * 1. / nepisodes
@@ -178,7 +169,7 @@ def show(env, model, actor, load_wts_from=None,
         score = 0
         while not done:
             env.render()
-            action = actor(obs)
+            action = actor.getaction(obs)
             obs, reward, done, _ = env.step(action)
             score += reward
         print("Score: %f" % score)

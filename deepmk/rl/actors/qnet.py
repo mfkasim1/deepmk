@@ -1,23 +1,44 @@
+from abc import ABCMeta, abstractmethod
 import numpy as np
 import torch
 from deepmk.rl.actors import Actor
 
-__all__ = ["QNet"]
+__all__ = ["QNetInterface", "QNet"]
 
-class QNet(Actor):
+class QNetInterface(Actor):
+    """
+    QNetInterface interface model to calculate Q(s,a), the value of a given
+    state, s, and an action, a. It should also be able to calculate the value
+    of a state by taking the value of max_a[Q(s,a)].
+    """
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def getaction(self, state):
+        pass
+
+    @abstractmethod
+    def value(self, states, actions):
+        pass
+
+    @abstractmethod
+    def max_value(self, states):
+        pass
+
+class QNet(QNetInterface):
     """
     Actor that picks an action, a, which maximizes the value of Q(s,a;t) given
-    a state, s, and the model's parameters, t. Training of the model minimizes
-    (Q(s,a;t) - val(s,a))^2.
+    a state, s, and the model's parameters, t.
 
     Args:
         model :
             A torch trainable class method that accepts state(s) and returns
             list prediction(s) of the next state values.
+        epsilon (float) :
+            Randomly pick an action with probability given by epsilon.
     """
-    def __init__(self, model, gamma=0.9, epsilon=0.1):
+    def __init__(self, model, epsilon=0.1):
         self.model = model
-        self.gamma = gamma
         self.epsilon = epsilon
 
     def getaction(self, state):
@@ -37,21 +58,13 @@ class QNet(Actor):
         action_suggest = int(out.argmax(dim=-1)[0])
 
         # random action with self.epsilon probability
-        rand = np.random.random() < self.epsilon
+        rand = (np.random.random() < self.epsilon) and self.model.training
         action = np.random.randint(out.shape[-1]) if rand else action_suggest
         return action
 
-    def value(self, states, actions, rewards, next_states, done, vals):
-        # the current state's predicted value
-        pred_vals = self.model.forward(states)\
-                    .gather(dim=-1, index=actions.unsqueeze(-1))
+    def value(self, states, actions):
+        return self.model.forward(states.float())\
+            .gather(dim=-1, index=actions.unsqueeze(dim=-1))
 
-        # the next state's predicted value
-        next_vals = self.model.forward(next_states.float()).max(dim=-1)[0]*self.gamma
-        # zeroing out the end of episode
-        next_vals = next_vals * (1.-done.float())
-        # the target value
-        target_vals = next_vals + rewards.float()
-        # target_vals = vals.float()
-        loss = (target_vals.data - pred_vals)**2
-        return loss.mean()
+    def max_value(self, states):
+        return self.model.forward(states.float()).max(dim=-1)[0]
