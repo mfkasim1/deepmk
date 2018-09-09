@@ -22,7 +22,7 @@ class QNetInterface(Actor):
         pass
 
     @abstractmethod
-    def max_value(self, states):
+    def max_value(self, states, arg=0):
         pass
 
 class QNet(QNetInterface):
@@ -66,5 +66,6 @@ class QNet(QNetInterface):
         return self.model.forward(states.float())\
             .gather(dim=-1, index=actions.unsqueeze(dim=-1))
 
-    def max_value(self, states):
-        return self.model.forward(states.float()).max(dim=-1)[0]
+    def max_value(self, states, arg=0):
+        idx = 1 if arg else 0
+        return self.model.forward(states.float()).max(dim=-1)[idx]
