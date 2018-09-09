@@ -7,13 +7,13 @@ class QLearn(Trainer):
     def __init__(self, qnet, optimizer, gamma=0.9):
         self.qnet = qnet
         self.optimizer = optimizer
-        self.episode = []
+        self.tuples = []
         self.gamma = gamma
 
     def trainstep(self, state, action, reward, next_state, done):
         # save the episode tuple
         tup = (state, action, reward, next_state, done)
-        self.episode.append(tup)
+        self.tuples.append(tup)
 
         # set the dataloader
         dataloader = self.getdataloader()
@@ -34,11 +34,8 @@ class QLearn(Trainer):
                 loss.backward()
                 self.optimizer.step()
 
-        # empty the episode array if it is done
-        if done:
-            self.episode = []
 
     def getdataloader(self):
-        tup = self.episode[-1]
+        tup = self.tuples[-1]
         dataloader = DataLoader([tup], batch_size=1)
         return dataloader
