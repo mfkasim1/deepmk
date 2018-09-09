@@ -22,9 +22,9 @@ trainer = QLearn(actor, optimizer, gamma=0.99)
 # scheduler = lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
 
 # train the model
-model = train(env, trainer, model, actor, optimizer,
+model = train(env, trainer, model, actor,
           reward_preproc=lambda x:x, scheduler=None, num_episodes=10000,
           val_every=20, val_episodes=10, verbose=1, plot=1,
-          save_wts_to="cartpole1.pkl", save_model_to=None)
+          save_wts_to="cartpole1.pkl")
 
 # show(env, model, actor, load_wts_from="cartpole.pkl")

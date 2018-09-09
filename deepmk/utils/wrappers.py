@@ -1,3 +1,4 @@
+__all__ = ["ObjectsWrapper"]
 
 class ObjectsWrapper(list):
     """

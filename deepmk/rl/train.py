@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import deepmk.spv as spv
-import deepmk.utils as mkutils, ObjectsWrapper
+import deepmk.utils as mkutils
 
 """
 This file contains method to train and test reinforcement learning model.
@@ -67,9 +67,9 @@ def train(env, trainer, model, actor,
         since = time.time()
 
     # wrap the model if it is a list
-    is_model_list = not issubclass(model, nn.Module)
+    is_model_list = not issubclass(model.__class__, nn.Module)
     if is_model_list:
-        model = ObjectsWrapper(model)
+        model = mkutils.ObjectsWrapper(model)
 
     best_model_weights = copy.deepcopy(model.state_dict())
     best_score = -np.inf
