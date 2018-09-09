@@ -4,6 +4,7 @@ import gym
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
+import deepmk.rl.dataloaders as rlloader
 from deepmk.rl.trainers import QLearn
 from deepmk.rl.actors import QNet
 from deepmk.rl import train, show
@@ -18,7 +19,10 @@ model = nn.Sequential(
 actor = QNet(model, epsilon=0.1)
 optimizer = optim.SGD(model.parameters(),
     lr=1e-2, momentum=0.01)
-trainer = QLearn(actor, optimizer, gamma=0.99)
+rldataloader = rlloader.ReplayMemoryLoader(batch_size=10, shuffle=True)
+trainer = QLearn(actor, optimizer, gamma=0.99,
+                 # rldataloader=rldataloader
+                 )
 # scheduler = lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
 
 # train the model

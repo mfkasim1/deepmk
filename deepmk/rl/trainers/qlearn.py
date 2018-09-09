@@ -1,34 +1,33 @@
+from collections import deque
 from torch.utils.data import DataLoader
 from deepmk.rl.trainers.trainer import Trainer
+from deepmk.rl.dataloaders import LastStepLoader
 
 __all__ = ["QLearn", "DoubleQLearn"]
 
 class QLearn(Trainer):
-    def __init__(self, qnet, optimizer, gamma=0.9, max_memory=1,
-                 dataloader_kwargs={}):
+    def __init__(self, qnet, optimizer, gamma=0.9,
+                 rldataloader=LastStepLoader()):
         self.qnet = qnet
         self.optimizer = optimizer
         self.tuples = []
         self.gamma = gamma
-        self.max_memory = max_memory
-        self.dataloader_kwargs = dataloader_kwargs
+        self.rldataloader = rldataloader
 
     def trainstep(self, state, action, reward, next_state, done):
         # save the episode tuple
         tup = (state, action, reward, next_state, done)
         self.tuples.append(tup)
-        if len(self.tuples) > self.max_memory: self.tuples.pop(0)
 
         # set the dataloader
-        dataloader = DataLoader(self.tuples, **self.dataloader_kwargs)
+        dataloader = self.rldataloader(self.tuples)
 
         # present the state and the target for the training
         if dataloader is not None:
-            for (s, a, r, snext, ep_done) in dataloader:
+            for s, a, r, snext, ep_done in dataloader:
                 # calculate the loss based on the tuple
                 snext_val = self.qnet.max_value(snext) * (1.0 - ep_done.float())
                 train_target = r.float() + self.gamma * snext_val
-                train_state = s.float()
                 pred_target = self.qnet.value(s, a)
 
                 loss = ((train_target.data - pred_target)**2).mean()
@@ -39,27 +38,25 @@ class QLearn(Trainer):
                 self.optimizer.step()
 
 class DoubleQLearn(Trainer):
-    def __init__(self, qnet1, qnet2, optimizer, gamma=0.9, max_memory=1,
-                 dataloader_kwargs={}):
+    def __init__(self, qnet1, qnet2, optimizer, gamma=0.9,
+                 rldataloader=LastStepLoader()):
         self.qnet1 = qnet1
         self.qnet2 = qnet2
         self.optimizer = optimizer
         self.tuples = []
         self.gamma = gamma
-        self.max_memory = max_memory
-        self.dataloader_kwargs = dataloader_kwargs
+        self.rldataloader = rldataloader
 
     def trainstep(self, state, action, reward, next_state, done):
         # save the episode tuple
         tup = (state, action, reward, next_state, done)
         self.tuples.append(tup)
-        if len(self.tuples) > self.max_memory: self.tuples.pop(0)
 
         # set the dataloader
-        dataloader = DataLoader(self.tuples, **self.dataloader_kwargs)
+        dataloader = self.rldataloader(self.tuples)
 
         if dataloader is not None:
-            for (s, a, r, snext, ep_done) in dataloader:
+            for s, a, r, snext, ep_done in dataloader:
                 snext = snext.float()
                 s = s.float()
                 r = r.float()
