@@ -161,7 +161,7 @@ def train(env, trainer, model, actor,
 
 def show(env, model, actor, load_wts_from=None):
 
-    is_model_list = not issubclass(model, nn.Module)
+    is_model_list = not issubclass(model.__class__, nn.Module)
 
     # load the model
     if load_wts_from is not None:
@@ -169,7 +169,7 @@ def show(env, model, actor, load_wts_from=None):
         if is_model_list:
             [m.load_state_dict(w) for (m,w) in zip(model,wts)]
         else:
-            model.load_state_dict()
+            model.load_state_dict(wts)
 
     # play the episode
     while True:
