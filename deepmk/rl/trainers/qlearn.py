@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader
 from deepmk.rl.trainers.trainer import Trainer
 
-__all__ = ["QLearn"]
+__all__ = ["QLearn", "DoubleQLearn"]
 
 class QLearn(Trainer):
     def __init__(self, qnet, optimizer, gamma=0.9):
@@ -34,6 +34,51 @@ class QLearn(Trainer):
                 loss.backward()
                 self.optimizer.step()
 
+    def getdataloader(self):
+        tup = self.tuples[-1]
+        dataloader = DataLoader([tup], batch_size=1)
+        return dataloader
+
+class DoubleQLearn(Trainer):
+    def __init__(self, qnet1, qnet2, optimizer, gamma=0.9):
+        self.qnet1 = qnet1
+        self.qnet2 = qnet2
+        self.optimizer = optimizer
+        self.tuples = []
+        self.gamma = gamma
+
+    def trainstep(self, state, action, reward, next_state, done):
+        # save the episode tuple
+        tup = (state, action, reward, next_state, done)
+        self.tuples.append(tup)
+
+        # set the dataloader
+        dataloader = self.getdataloader()
+
+        if dataloader is not None:
+            for (s, a, r, snext, ep_done) in dataloader:
+                snext = snext.float()
+                s = s.float()
+                r = r.float()
+                # calculate the loss based on the tuple
+                zero_epdone = (1.0 - ep_done.float())
+                qa = self.qnet1.value(s, a)
+                qb = self.qnet2.value(s, a)
+                qa_next = self.qnet1.value(snext, self.qnet2.max_value(snext,arg=1))*\
+                    zero_epdone
+                qb_next = self.qnet2.value(snext, self.qnet1.max_value(snext,arg=1))*\
+                    zero_epdone
+                train_target_a = r + self.gamma * qb_next
+                train_target_b = r + self.gamma * qa_next
+
+                loss_a = ((train_target_a.data - qa)**2).mean()
+                loss_b = ((train_target_b.data - qb)**2).mean()
+
+                # step the optimizer
+                self.optimizer.zero_grad()
+                loss_a.backward()
+                loss_b.backward()
+                self.optimizer.step()
 
     def getdataloader(self):
         tup = self.tuples[-1]
