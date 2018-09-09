@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import deepmk.spv as spv
-import deepmk.utils as mkutils
+import deepmk.utils as mkutils, ObjectsWrapper
 
 """
 This file contains method to train and test reinforcement learning model.
@@ -16,7 +16,7 @@ __all__ = ["train", "show"]
 def train(env, trainer, model, actor,
           reward_preproc=lambda x:x, scheduler=None, num_episodes=1000,
           val_every=20, val_episodes=10, verbose=1, plot=0,
-          save_wts_to=None, save_model_to=None):
+          save_wts_to=None):
 
     """
     Performs a training of the model.
@@ -27,9 +27,10 @@ def train(env, trainer, model, actor,
         trainer (deepmk.rl.trainers.Trainer) :
             The RL algorithm object that do the training
             every step and/or episode.
-        model :
-            A torch trainable class method that accepts "inputs" and returns
-            prediction of "outputs".
+        model (torch.nn.Model or list) :
+            A torch trainable class method that accepts
+            "inputs" and returns prediction of "outputs".
+            If a list is given, then train all the models.
         actor :
             An object that receives a state and returns an action
             recommendation.
@@ -52,13 +53,11 @@ def train(env, trainer, model, actor,
         save_wts_to (str) :
             Name of a file to save the best model's weights. If None, then do
             not save. (default: None)
-        save_model_to (str) :
-            Name of a file to save the best whole model. If None, then do not
-            save. (default: None)
 
     Returns:
         best_model :
-            The trained model with the best criterion during "val" phase.
+            The trained model with the best criterion during
+            "val" phase.
     """
     # set interactive plot
     if plot:
@@ -66,6 +65,12 @@ def train(env, trainer, model, actor,
 
     if verbose >= 1:
         since = time.time()
+
+    # wrap the model if it is a list
+    is_model_list = not issubclass(model, nn.Module)
+    if is_model_list:
+        model = ObjectsWrapper(model)
+
     best_model_weights = copy.deepcopy(model.state_dict())
     best_score = -np.inf
     val_scores = []
@@ -116,8 +121,8 @@ def train(env, trainer, model, actor,
         if phase == "val":
             val_scores.append(avg_score)
 
-            for name, param in model.named_parameters():
-                if param.requires_grad: print name, param.data
+            # for name, param in model.named_parameters():
+            #     if param.requires_grad: print name, param.data
 
             # print the progress
             if verbose >= 1:
@@ -130,8 +135,6 @@ def train(env, trainer, model, actor,
                 best_model_weights = copy.deepcopy(model.state_dict())
 
                 # save the model
-                if save_model_to is not None:
-                    mkutils.save(model, save_model_to)
                 if save_wts_to is not None:
                     mkutils.save(model.state_dict(), save_wts_to)
 
@@ -150,16 +153,23 @@ def train(env, trainer, model, actor,
         print("Best val score: %.4f" % best_score)
 
     # load the best model
-    model.load_state_dict(best_model_weights)
+    if is_model_list:
+        [m.load_state_dict(w) for (m,w) in zip(model, best_model_weights)]
+    else:
+        model.load_state_dict(best_model_weights)
     return model
 
-def show(env, model, actor, load_wts_from=None,
-         load_model_from=None):
+def show(env, model, actor, load_wts_from=None):
+
+    is_model_list = not issubclass(model, nn.Module)
+
     # load the model
-    if load_model_from is not None:
-        model = torch.load(load_model_from)
-    elif load_wts_from is not None:
-        model.load_state_dict(torch.load(load_wts_from))
+    if load_wts_from is not None:
+        wts = torch.load(load_wts_from)
+        if is_model_list:
+            [m.load_state_dict(w) for (m,w) in zip(model,wts)]
+        else:
+            model.load_state_dict()
 
     # play the episode
     while True:
