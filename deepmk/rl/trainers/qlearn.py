@@ -4,12 +4,11 @@ from deepmk.rl.trainers.trainer import Trainer
 __all__ = ["QLearn"]
 
 class QLearn(Trainer):
-    def __init__(self, qnet, optimizer, level=1, gamma=0.9):
+    def __init__(self, qnet, optimizer, gamma=0.9):
         self.qnet = qnet
         self.optimizer = optimizer
         self.episode = []
         self.gamma = gamma
-        self.level = level
 
     def trainstep(self, state, action, reward, next_state, done):
         # save the episode tuple
