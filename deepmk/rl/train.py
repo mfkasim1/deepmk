@@ -102,9 +102,10 @@ def train(env, trainer, model, actor,
                 score += reward
 
                 # get the dataloader to train the model
-                dataloader = trainer.trainstep(state, \
-                    action, reward, next_state, \
-                    episode_done)
+                if phase == "train":
+                    dataloader = trainer.trainstep(state, \
+                        action, reward, next_state, \
+                        episode_done)
 
                 # update the state to the next state
                 state = next_state
