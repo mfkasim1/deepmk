@@ -13,7 +13,7 @@ This file contains method to train and test reinforcement learning model.
 
 __all__ = ["train", "show"]
 
-def train(env, trainer, model, actor, optimizer,
+def train(env, trainer, model, actor,
           reward_preproc=lambda x:x, scheduler=None, num_episodes=1000,
           val_every=20, val_episodes=10, verbose=1, plot=0,
           save_wts_to=None, save_model_to=None):
@@ -33,8 +33,6 @@ def train(env, trainer, model, actor, optimizer,
         actor :
             An object that receives a state and returns an action
             recommendation.
-        optimizer (torch.optim optimizer) :
-            Optimizer class in training the model.
         reward_preproc (function) :
             Reward preprocessor. (default: lambda x:x)
         scheduler (torch.optim.lr_scheduler object):
