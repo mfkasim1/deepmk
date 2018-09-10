@@ -13,6 +13,7 @@ import numpy as np
 import torchvision
 from torchvision import datasets, models, transforms
 import deepmk
+import deepmk.criteria
 
 # data directory
 fdir = os.path.split(os.path.abspath(__file__))[0]
@@ -57,7 +58,10 @@ num_ftrs = model_ft.fc.in_features
 model_ft.fc = nn.Linear(num_ftrs, 2)
 
 # cross entropy loss for multi classes classifications
-criterion = nn.CrossEntropyLoss()
+criterion = {
+    "train": nn.CrossEntropyLoss(),
+    "val": deepmk.criteria.Accuracy(),
+}
 
 optimizer_ft = optim.SGD(model_ft.fc.parameters(), lr=0.001, momentum=0.9)
 
