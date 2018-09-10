@@ -8,12 +8,14 @@ __all__ = ["QLearn"]
 
 class QLearn(Trainer):
     def __init__(self, qnet, optimizer, gamma=0.9, update_every=1,
+                 train_after=0,
                  rldataloader=LastStepLoader()):
         self.qnet = qnet
         self.optimizer = optimizer
         self.tuples = []
         self.gamma = gamma
         self.update_every = update_every
+        self.train_after = train_after
         self.rldataloader = rldataloader
 
         self.qnet_old = copy.deepcopy(qnet)
@@ -23,6 +25,10 @@ class QLearn(Trainer):
         # save the episode tuple
         tup = (state, action, reward, next_state, done)
         self.tuples.append(tup)
+
+        if self.num_steps < self.train_after:
+            self.num_steps += 1
+            return
 
         # set the dataloader
         dataloader = self.rldataloader(self.tuples)
@@ -47,4 +53,3 @@ class QLearn(Trainer):
         # update the fixed models
         if self.num_steps % self.update_every == 0:
             self.qnet_old = copy.deepcopy(self.qnet)
-            self.num_steps = 0
