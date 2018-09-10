@@ -181,13 +181,14 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
             # get the mean loss in this epoch
             mult = -1 if (criteria[phase].best == "max") else 1
-            epoch_loss = mult*criteria[phase].getval()
+            crit_val = criteria[phase].getval()
+            epoch_loss = mult * crit_val
 
             # save the losses
             if phase == "train":
-                train_losses.append(epoch_loss)
+                train_losses.append(crit_val)
             elif phase == "val":
-                val_losses.append(epoch_loss)
+                val_losses.append(crit_val)
 
             # copy the best model
             if phase == "val" and epoch_loss < best_loss:
