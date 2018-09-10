@@ -8,6 +8,7 @@ import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
 import deepmk.utils as mkutils
+import deepmk.criteria
 
 """
 This file contains method to train and test supervised learning model.
@@ -15,7 +16,7 @@ This file contains method to train and test supervised learning model.
 
 __all__ = ["train"]
 
-def train(model, dataloaders, criterion, optimizer, scheduler=None,
+def train(model, dataloaders, criteria, optimizer, scheduler=None,
           num_epochs=25, device=None, verbose=1, plot=0, save_wts_to=None,
           save_model_to=None):
     """
@@ -30,10 +31,15 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
             iterable with two outputs: (1) the "inputs" to the model and (2) the
             ground truth of the "outputs". If it is a DataLoader, then it's only
             for the training, nothing for validation.
-        criterion (function or evaluable class):
-            Receives the prediction of the "outputs" as the first argument, and
-            the ground truth of the "outputs" as the second argument. It returns
-            the loss function to be minimized.
+        criteria (dict or callable or deepmk.criteria):
+            Dictionary with two keys: ["train", "val"] with every value is a
+            callable or deepmk.criteria to calculate the criterion for the
+            corresponding phase. If it is not a dictionary, then the criterion
+            is set for both training and validation phases.
+            If it is a callable, it is wrapped by deepmk.criteria.MeanCriterion
+            object to calculate the mean criterion.
+            The criterion for the training needs to be differentiable and it
+            will be minimized during the training.
         optimizer (torch.optim optimizer):
             Optimizer class in training the model.
         scheduler (torch.optim.lr_scheduler object):
@@ -71,6 +77,14 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
     if type(dataloaders) != dict:
         dataloaders = {"train": dataloaders, "val": []}
 
+    # set the criteria object right
+    if type(criteria) != dict:
+        criteria = {"train": criteria, "val": criteria}
+    for phase in ["train", "val"]:
+        if not issubclass(criteria[phase].__class__, deepmk.criteria.Criterion):
+            criteria[phase] = deepmk.criteria.MeanCriterion(criteria[phase])
+        criteria[phase].reset()
+
     # load the model to the device first
     model = model.to(device)
 
@@ -97,6 +111,7 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
 
         # every epoch has a training and a validation phase
         for phase in ["train", "val"]:
+
             # skip phase if the dataloaders for the current phase is empty
             if dataloaders[phase] == []: continue
 
@@ -114,6 +129,8 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
             # iterate over the data
             dataset_size = 0
 
+            # reset the criteria before the training epoch starts
+            criteria[phase].reset()
             for inputs, labels in dataloaders[phase]:
                 # get the size of the dataset
                 dataset_size += inputs.size(0)
@@ -137,8 +154,8 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
 
                     # print the progress
                     print("Progress: [%s] %8d/%8d. " \
-                          "Elapsed time: %s. "\
-                          "Estimated remaining time: %s" % \
+                          "Elapsed: %s. "\
+                          "ETA: %s" % \
                           (progress_str, num_batches, total_batches,
                           mkutils.to_time_str(elapsed_time),
                           mkutils.to_time_str(remaining_time)))
@@ -155,18 +172,16 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
                 # track history if only in train
                 with torch.set_grad_enabled(phase == "train"):
                     outputs = model(inputs)
-                    loss = criterion(outputs, labels)
+                    loss = criteria[phase].feed(outputs, labels)
 
                     # backward gradient computation and optimize in training
                     if phase == "train":
                         loss.backward()
                         optimizer.step()
 
-                # statistics
-                running_loss += loss.item() * inputs.size(0)
-
             # get the mean loss in this epoch
-            epoch_loss = running_loss / float(dataset_size)
+            mult = -1 if (criteria[phase].best == "max") else 1
+            epoch_loss = mult*criteria[phase].getval()
 
             # save the losses
             if phase == "train":
@@ -187,8 +202,10 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
 
         # show the loss in the current epoch
         if verbose >= 1:
-            print("train loss: %.4f, val loss: %.4f, done in %fs" % \
-                  (train_losses[-1], val_losses[-1], time.time()-since))
+            print("train %s: %.4f, val %s: %.4f, done in %fs" % \
+                  (criteria["train"].name, train_losses[-1],
+                   criteria["val"].name, val_losses[-1],
+                   time.time()-since))
         # plot the losses
         if plot:
             xs_plot = range(1,epoch+2)
@@ -216,6 +233,10 @@ def validate(model, dataloader, val_criterion, device=None, verbose=1,
     # get the device
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    # load the weights
+    if load_wts_from is not None:
+        model.load_state_dict(torch.load(load_wts_from))
 
     # load the model to the device first and set to evaluation mode
     model = model.to(device)
