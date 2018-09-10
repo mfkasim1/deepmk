@@ -100,6 +100,7 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
             # skip phase if the dataloaders for the current phase is empty
             if dataloaders[phase] == []: continue
 
+            # set the model's mode
             if phase == "train":
                 if scheduler is not None:
                     scheduler.step() # adjust the training learning rate
@@ -209,3 +210,29 @@ def train(model, dataloaders, criterion, optimizer, scheduler=None,
     # load the best model
     model.load_state_dict(best_model_weights)
     return model
+
+def validate(model, dataloader, val_criterion, device=None, verbose=1,
+             load_wts_from=None):
+    # get the device
+    if device is None:
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    # load the model to the device first and set to evaluation mode
+    model = model.to(device)
+    model.eval()
+
+    # reset the validation criterion
+    val_criterion.reset()
+
+    for inputs, labels in dataloader:
+        # load the data to the device
+        inputs.to(device)
+        labels.to(device)
+
+        # calculate the validation criterion
+        with torch.set_grad_enabled(False):
+            outputs = model(inputs)
+            val_criterion.feed(outputs, labels)
+
+    print("Validation with %s criterion: %e",
+          val_criterion.name, val_criterion.getval())
