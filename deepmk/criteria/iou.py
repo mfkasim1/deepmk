@@ -3,9 +3,13 @@ from deepmk.criteria.criterion import Criterion
 class IoU(Criterion):
     """
     Intersect over Union criterion for semantic segmentation. It is fed on
-    predictions and targets. Predictions have last dimension with the size of
-    the number of object classes and the values are the confidence on the object
-    (0-1). Targets have the same shape as predictions with values {0,1}.
+    predictions and targets.
+    Predictions have first dimension with the size of the number of object
+    classes. The prediction values can be multi-class single label (softmax) or
+    multi-class multi-label (sigmoid), but in either case, it has to be [0,1].
+    The targets can be a label, i.e. has the shape similar to predictions (with
+    missing the first dimension) with long type elements, or a map of {0,1} with
+    the same shape as the predictions.
     """
     def __init__(self, last_layer="sigmoid"):
         self.last_layer = last_layer
