@@ -12,6 +12,7 @@ import deepmk.datasets as mkdatasets
 import deepmk.models as mkmodels
 import deepmk.transforms as mktransforms
 import deepmk.criteria as mkcriteria
+import deepmk.utils as mkutils
 
 name = "01-coco"
 
@@ -22,15 +23,21 @@ coco_both_transform = transforms.Compose([
 coco_img_transform = transforms.Compose([
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
+# target transform to get the background as well
+def target_transform(target):
+    tgt_max, tgt_amax = target.max(dim=0)
+    return torch.where(tgt_max > 0.0, tgt_amax+1, torch.zeros_like(tgt_amax))
+
 fdir = os.path.dirname(os.path.abspath(__file__))
 coco_dir = os.path.join(fdir, "..", "..", "dataset", "coco")
+
 # get the coco dataset
 coco = {
     x: mkdatasets.CocoDetection(os.path.join(coco_dir, "%s2017"%x),
         os.path.join(coco_dir, "annotations", ("instances_%s2017.json"%x)),
         both_transform=coco_both_transform,
         img_transform=coco_img_transform,
-        target_transform=lambda tgt: tgt.argmax(dim=0)) # argmax over the channel
+        target_transform=target_transform) # argmax over the channel
     for x in ["train", "val"]
 }
 # dataloader
@@ -41,15 +48,14 @@ dataloader = {
 
 # construct the model
 model = nn.Sequential(
-    mkmodels.fcn8(coco["train"].ncategories),
+    mkmodels.fcn8(coco["train"].ncategories+1), # plus the background
     nn.LogSoftmax(dim=1) # softmax over the channel
 )
-
 criteria = {
     # criterion: binary cross entropy with logits loss
     # (i.e. classification done per-pixel)
     "train": nn.NLLLoss(),
-    "val": mkcriteria.IoU(last_layer="softmax")
+    "val": mkcriteria.IoU(last_layer="softmax", exclude_channels=0)
 }
 
 # the learning process
