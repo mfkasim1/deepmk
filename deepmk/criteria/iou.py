@@ -15,8 +15,13 @@ class IoU(Criterion):
     missing the first dimension) with long type elements, or a map of {0,1} with
     the same shape as the predictions.
     """
-    def __init__(self, last_layer="sigmoid"):
+    def __init__(self, last_layer="sigmoid", exclude_channels=None):
         self.last_layer = last_layer
+        # preprocess exclude_channels
+        if exclude_channels is not None:
+            if not hasattr(exclude_channels, "__iter__"):
+                exclude_channels = [exclude_channels]
+        self.exclude_channels = exclude_channels
         self.reset()
 
     def reset(self):
@@ -42,6 +47,14 @@ class IoU(Criterion):
         # convert them to float
         preds = preds.float()
         targets = targets.float()
+
+        if self.exclude_channels is not None:
+            nchannels = preds.shape[1]
+            channels = np.arange(nchannels)
+            channels = np.delete(channels, self.exclude_channels)
+            channels = torch.from_numpy(channels).long().to(preds.device)
+            preds = preds[:,channels,:,:]
+            targets = targets[:,channels,:,:]
 
         # calculate the intersects and the unions
         intersect = (preds * targets).sum()
