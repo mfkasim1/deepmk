@@ -29,31 +29,36 @@ coco = {
     x: mkdatasets.CocoDetection(os.path.join(coco_dir, "%s2017"%x),
         os.path.join(coco_dir, "annotations", ("instances_%s2017.json"%x)),
         both_transform=coco_both_transform,
-        img_transform=coco_img_transform)
+        img_transform=coco_img_transform,
+        target_transform=lambda tgt: tgt.argmax(dim=0)) # argmax over the channel
     for x in ["train", "val"]
 }
 # dataloader
 dataloader = {
-    x: DataLoader(coco[x], batch_size=16, shuffle=True, num_workers=16)
+    x: DataLoader(coco[x], batch_size=16, shuffle=(x=="train"), num_workers=16)
     for x in ["train", "val"]
 }
 
-# load the model
-fcn = mkmodels.fcn8(coco["train"].ncategories)
+# construct the model
+model = nn.Sequential(
+    mkmodels.fcn8(coco["train"].ncategories),
+    nn.LogSoftmax(dim=1) # softmax over the channel
+)
 
 criteria = {
     # criterion: binary cross entropy with logits loss
     # (i.e. classification done per-pixel)
-    "train": nn.BCEWithLogitsLoss(),
-    "val": mkcriteria.IoU()
+    "train": nn.NLLLoss(),
+    "val": mkcriteria.IoU(last_layer="softmax")
 }
 
 # the learning process
-optimizer = optim.SGD(fcn.parameters(), lr=0.001, momentum=0.9)
+optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
-# deepmk.spv.train(fcn, dataloader, criteria, optimizer,
-#     scheduler=scheduler, plot=0, save_wts_to=name+".pkl", verbose=2)
+deepmk.spv.train(model, dataloader, criteria, optimizer,
+    scheduler=scheduler, plot=0, save_wts_to=name+".pkl", verbose=2)
 
-deepmk.spv.validate(fcn, dataloader["val"], criteria["val"],
-    load_wts_from=name+".pkl", verbose=2)
+# deepmk.spv.validate(model, dataloader["val"], criteria["val"],
+#     # load_wts_from=name+".pkl",
+#     verbose=2)
