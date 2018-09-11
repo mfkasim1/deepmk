@@ -7,7 +7,8 @@ class IoU(Criterion):
     the number of object classes and the values are the confidence on the object
     (0-1). Targets have the same shape as predictions with values {0,1}.
     """
-    def __init__(self):
+    def __init__(self, last_layer="sigmoid"):
+        self.last_layer = last_layer
         self.reset()
 
     def reset(self):
@@ -15,7 +16,21 @@ class IoU(Criterion):
         self.union = 0.0
 
     def feed(self, preds, targets):
-        preds = (preds > 0.5).float()
+        ndim0 = preds.shape[0]
+
+        # if the target is presented as a label, then expand it to a binary
+        # {0,1} corresponding to the class
+        if len(targets.shape) != len(preds.shape):
+            targets = _fill_channel(targets, ndim0)
+
+        # change the predictions to have binary values
+        if self.last_layer == "softmax":
+            preds = _max_to_one(preds)
+        elif self.last_layer == "sigmoid":
+            preds = (preds > 0.5)
+
+        # convert them to float
+        preds = preds.float()
         targets = targets.float()
 
         # calculate the intersects and the unions
@@ -38,3 +53,17 @@ class IoU(Criterion):
     @property
     def best(self):
         return "max"
+
+def _max_to_one(tensor):
+    # get a map of {0,1} with 1 is in place of the maximum in the 0-th dimension
+    # and others are 0
+    _, max_idx = preds.max(dim=0)
+    return _fill_channel(max_idx, preds.shape[0])
+
+def _fill_channel(tensor, ndim0):
+    numel = tensor.numel()
+    map = torch.arange(numel).reshape(tensor.shape)
+    idx = tensor * numel + map
+    res = torch.zeros(ndim0, *tensor.shape)
+    res.view(-1)[idx.view(-1)] = 1.0
+    return res
