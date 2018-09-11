@@ -15,14 +15,12 @@ class IoU(Criterion):
     missing the first dimension) with long type elements, or a map of {0,1} with
     the same shape as the predictions.
     """
-    def __init__(self, last_layer="sigmoid", channel_dim=1, exclude_channels=None):
+    def __init__(self, last_layer="sigmoid", channel_dim=1,
+                 exclude_channels=None):
         self.last_layer = last_layer
         self.channel_dim = channel_dim
-        # preprocess exclude_channels
-        if exclude_channels is not None:
-            if not hasattr(exclude_channels, "__iter__"):
-                exclude_channels = [exclude_channels]
-        self.exclude_channels = exclude_channels
+        self.exclude_channels = self._normalize_exclude_channels(
+                                exclude_channels)
         self.reset()
 
     def reset(self):
@@ -52,23 +50,7 @@ class IoU(Criterion):
 
         # exclude some channels, if specified
         if self.exclude_channels is not None:
-            nchannels = preds.shape[self.channel_dim]
-            channels = np.arange(nchannels)
-            channels = np.delete(channels, self.exclude_channels)
-            channels = torch.from_numpy(channels).long().to(preds.device)
-
-            # construct the tuple idx to only include channels in `channels`
-            tup_idx = []
-            for i in range(len(preds.shape)):
-                if i == self.channel_dim:
-                    tup_idx.append(channels)
-                else:
-                    tup_idx.append(slice(None,None,None))
-            tup_idx = tuple(tup_idx)
-
-            # apply the indexing
-            preds = preds[tup_idx] # [:,channels,:,:]
-            targets = targets[tup_idx] # [:,channels,:,:]
+            preds, targets = self._exclude(preds, targets)
 
         # calculate the intersects and the unions
         intersect = (preds * targets).sum()
@@ -90,3 +72,32 @@ class IoU(Criterion):
     @property
     def best(self):
         return "max"
+
+    def _normalize_exclude_channels(self, exclude_channels):
+        # preprocess exclude_channels
+        if exclude_channels is not None:
+            if not hasattr(exclude_channels, "__iter__"):
+                exclude_channels = [exclude_channels]
+        return exclude_channels
+
+    def _exclude(self, preds, targets):
+        # exclude the channels in preds and targets as specified in
+        # self.exclude_channels
+        nchannels = preds.shape[self.channel_dim]
+        channels = np.arange(nchannels)
+        channels = np.delete(channels, self.exclude_channels)
+        channels = torch.from_numpy(channels).long().to(preds.device)
+
+        # construct the tuple idx to only include channels in `channels`
+        tup_idx = []
+        for i in range(len(preds.shape)):
+            if i == self.channel_dim:
+                tup_idx.append(channels)
+            else:
+                tup_idx.append(slice(None,None,None))
+        tup_idx = tuple(tup_idx)
+
+        # apply the indexing
+        preds = preds[tup_idx] # [:,channels,:,:]
+        targets = targets[tup_idx] # [:,channels,:,:]
+        return preds, targets
