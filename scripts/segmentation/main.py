@@ -11,6 +11,7 @@ import torchvision.transforms as transforms
 import deepmk.datasets as mkdatasets
 import deepmk.models as mkmodels
 import deepmk.transforms as mktransforms
+import deepmk.criteria as mkcriteria
 
 name = "01-coco"
 
@@ -40,16 +41,19 @@ dataloader = {
 # load the model
 fcn = mkmodels.fcn8(coco["train"].ncategories)
 
-# criterion: binary cross entropy with logits loss
-# (i.e. classification done per-pixel)
-criterion = nn.BCEWithLogitsLoss()
+criteria = {
+    # criterion: binary cross entropy with logits loss
+    # (i.e. classification done per-pixel)
+    "train": nn.BCEWithLogitsLoss(),
+    "val": mkcriteria.IoU()
+}
 
 # the learning process
 optimizer = optim.SGD(fcn.parameters(), lr=0.001, momentum=0.9)
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
-# train(model, dataloaders, criterion, optimizer, scheduler=None,
-#           num_epochs=25, device=None, verbose=1, plot=0, save_wts_to=None,
-#           save_model_to=None)
-deepmk.spv.train(fcn, dataloader, criterion, optimizer,
-    scheduler=scheduler, plot=0, save_wts_to=name+".pkl", verbose=2)
+# deepmk.spv.train(fcn, dataloader, criteria, optimizer,
+#     scheduler=scheduler, plot=0, save_wts_to=name+".pkl", verbose=2)
+
+deepmk.spv.validate(fcn, dataloader["val"], criteria["val"],
+    load_wts_from=name+".pkl", verbose=2)
