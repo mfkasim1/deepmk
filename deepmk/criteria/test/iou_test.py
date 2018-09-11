@@ -57,6 +57,7 @@ class IoUTest(unittest.TestCase):
 
         self.assertAlmostEqual(crit.getval(), 0.0)
 
+# genereate the test functions for various dimensions and layers
 shapes = [(2,3,4), (2,3,4,5), (2,3,4,5,6)]
 layers = ["sigmoid", "softmax"]
 for shape in shapes:
