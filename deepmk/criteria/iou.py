@@ -15,8 +15,9 @@ class IoU(Criterion):
     missing the first dimension) with long type elements, or a map of {0,1} with
     the same shape as the predictions.
     """
-    def __init__(self, last_layer="sigmoid", exclude_channels=None):
+    def __init__(self, last_layer="sigmoid", channel_dim=1, exclude_channels=None):
         self.last_layer = last_layer
+        self.channel_dim = channel_dim
         # preprocess exclude_channels
         if exclude_channels is not None:
             if not hasattr(exclude_channels, "__iter__"):
@@ -29,18 +30,19 @@ class IoU(Criterion):
         self.union = 0.0
 
     def feed(self, preds, targets):
-        assert len(preds.shape) == 4
+        assert len(preds.shape) > 2
 
-        ndim1 = preds.shape[1]
+        ndim1 = preds.shape[self.channel_dim]
 
         # if the target is presented as a label, then expand it to a binary
         # {0,1} corresponding to the class
         if len(targets.shape) != len(preds.shape):
-            targets = mkutils.fill_channel(targets, ndim1)
+            targets = mkutils.fill_channel(targets, ndim1,
+                                           channel_dim=self.channel_dim)
 
         # change the predictions to have binary values
         if self.last_layer == "softmax":
-            preds = mkutils.max_to_one(preds)
+            preds = mkutils.max_to_one(preds, channel_dim=self.channel_dim)
         elif self.last_layer == "sigmoid":
             preds = (preds > 0.5)
 
@@ -48,13 +50,25 @@ class IoU(Criterion):
         preds = preds.float()
         targets = targets.float()
 
+        # exclude some channels, if specified
         if self.exclude_channels is not None:
-            nchannels = preds.shape[1]
+            nchannels = preds.shape[self.channel_dim]
             channels = np.arange(nchannels)
             channels = np.delete(channels, self.exclude_channels)
             channels = torch.from_numpy(channels).long().to(preds.device)
-            preds = preds[:,channels,:,:]
-            targets = targets[:,channels,:,:]
+
+            # construct the tuple idx to only include channels in `channels`
+            tup_idx = []
+            for i in range(len(preds.shape)):
+                if i == self.channel_dim:
+                    tup_idx.append(channels)
+                else:
+                    tup_idx.append(slice(None,None,None))
+            tup_idx = tuple(tup_idx)
+
+            # apply the indexing
+            preds = preds[tup_idx] # [:,channels,:,:]
+            targets = targets[tup_idx] # [:,channels,:,:]
 
         # calculate the intersects and the unions
         intersect = (preds * targets).sum()
