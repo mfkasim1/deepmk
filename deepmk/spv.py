@@ -107,7 +107,8 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
         # progress counter
         num_batches = 0 # num batches in training and validation
-        if verbose >= 2: progress_printed = False
+        if verbose >= 2:
+            progress_disp = mkutils.ProgressDisplay()
 
         # every epoch has a training and a validation phase
         for phase in ["train", "val"]:
@@ -138,28 +139,7 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
                 # write the progress bar
                 if verbose >= 2:
-                    # delete the row
-                    if progress_printed:
-                        print("\033[F" + (" "*1) + "\033[F")
-
-                    # get the progress bar
-                    progress = num_batches * 1. / total_batches
-                    len_progress_bar = 20
-                    progress_str = "=" * (int(progress*len_progress_bar))
-                    progress_str += " " * (len_progress_bar - len(progress_str))
-
-                    # estimated time
-                    elapsed_time = time.time() - epoch_start_time
-                    remaining_time = elapsed_time / progress * (1. - progress)
-
-                    # print the progress
-                    print("Progress: [%s] %8d/%8d. " \
-                          "Elapsed: %s. "\
-                          "ETA: %s" % \
-                          (progress_str, num_batches, total_batches,
-                          mkutils.to_time_str(elapsed_time),
-                          mkutils.to_time_str(remaining_time)))
-                    progress_printed = True
+                    progress_disp.show(num_batches, total_batches)
 
                 # load the inputs and the labels to the working device
                 inputs = inputs.to(device)
@@ -235,26 +215,38 @@ def validate(model, dataloader, val_criterion, device=None, verbose=1,
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+    # load the model to the device
+    model = model.to(device)
+
     # load the weights
     if load_wts_from is not None:
         model.load_state_dict(torch.load(load_wts_from))
 
-    # load the model to the device first and set to evaluation mode
-    model = model.to(device)
+    # set to evaluation mode
     model.eval()
 
     # reset the validation criterion
     val_criterion.reset()
 
+    num_batches = 0 # num batches
+    total_batches = len(dataloader)
+    if verbose >= 2:
+        progress_disp = mkutils.ProgressDisplay()
     for inputs, labels in dataloader:
+        num_batches += 1
+
         # load the data to the device
-        inputs.to(device)
-        labels.to(device)
+        inputs = inputs.to(device)
+        labels = labels.to(device)
 
         # calculate the validation criterion
         with torch.set_grad_enabled(False):
             outputs = model(inputs)
             val_criterion.feed(outputs, labels)
 
-    print("Validation with %s criterion: %e",
-          val_criterion.name, val_criterion.getval())
+        # write the progress bar
+        if verbose >= 2:
+            progress_disp.show(num_batches, total_batches)
+
+    print("Validation with %s criterion: %e" %
+          (val_criterion.name, val_criterion.getval()))
