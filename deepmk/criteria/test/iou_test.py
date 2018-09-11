@@ -16,7 +16,7 @@ class IoUTest(unittest.TestCase):
             seed = 13214+i
             targets_bin = generate_unique_channel(shape,channel_dim=1,seed=seed)
             targets_label = targets_bin.argmax(dim=1)
-            preds = generate_unique_channel(shape, channel_dim=1, a=0.8, b=0.1,
+            preds = generate_unique_channel(shape, channel_dim=1, a=0.4, b=0.3,
                     seed=seed)
 
             # test with binary labels and the labels
@@ -33,6 +33,54 @@ class IoUTest(unittest.TestCase):
             union += targets_bin.sum()
 
         self.assertAlmostEqual(crit.getval(), intersection / union)
+
+    def test_sigmoid_2d(self):
+        crit = IoU(last_layer="sigmoid")
+
+        # create a custom target and prediction
+        shape = (2,3,4,5)
+        intersection = 0.0
+        union = 0.0
+        for i in range(2):
+            seed = 13214+i
+            targets_bin = generate_unique_channel(shape,channel_dim=1,seed=seed)
+            targets_label = targets_bin.argmax(dim=1)
+            preds = generate_unique_channel(shape, channel_dim=1, a=0.9, b=0.3,
+                    seed=seed)
+
+            # test with binary labels and the labels
+            self.assertAlmostEqual(crit.feed(preds, targets_bin), 1.0)
+            intersection += targets_bin.sum()
+            union += targets_bin.sum()
+
+            self.assertAlmostEqual(crit.feed(preds, 1-targets_bin), 0.0)
+            intersection += 0.0
+            union += targets_bin.numel()
+
+            self.assertAlmostEqual(crit.feed(preds, targets_label), 1.0)
+            intersection += targets_bin.sum()
+            union += targets_bin.sum()
+
+        self.assertAlmostEqual(crit.getval(), intersection / union)
+
+    def test_sigmoid_2d_wrong_model(self):
+        crit = IoU(last_layer="sigmoid")
+
+        # create a custom target and prediction
+        shape = (2,3,4,5)
+        for i in range(2):
+            seed = 13214+i
+            targets_bin = generate_unique_channel(shape,channel_dim=1,seed=seed)
+            targets_label = targets_bin.argmax(dim=1)
+            preds = generate_unique_channel(shape, channel_dim=1, a=0.4, b=0.3,
+                    seed=seed)
+
+            # test with binary labels and the labels
+            self.assertAlmostEqual(crit.feed(preds, targets_bin), 0.0)
+            self.assertAlmostEqual(crit.feed(preds, 1-targets_bin), 0.0)
+            self.assertAlmostEqual(crit.feed(preds, targets_label), 0.0)
+
+        self.assertAlmostEqual(crit.getval(), 0.0)
 
 def generate_unique_channel(shape, channel_dim=1, a=1.0, b=0.0, seed=None):
     if seed is not None: np.random.seed(seed)
