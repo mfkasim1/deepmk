@@ -250,4 +250,4 @@ def validate(model, dataloader, val_criterion, device=None, verbose=1,
 
     print("Validation with %s criterion: %e" %
           (val_criterion.name, val_criterion.getval()))
-    return val_criterion.getval().data
+    return float(val_criterion.getval())
