@@ -183,7 +183,7 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
         # show the loss in the current epoch
         if verbose >= 1:
-            print("train %s: %.4f, val %s: %.4f, done in %fs" % \
+            print("train %s: %.4e, val %s: %.4e, done in %fs" % \
                   (criteria["train"].name, train_losses[-1],
                    criteria["val"].name, val_losses[-1],
                    time.time()-since))
@@ -207,7 +207,7 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
     # load the best model
     model.load_state_dict(best_model_weights)
-    return model
+    return model, best_loss
 
 def validate(model, dataloader, val_criterion, device=None, verbose=1,
              load_wts_from=None):
