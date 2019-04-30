@@ -68,6 +68,8 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
     # get the device
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print("Using device:")
+    print(device)
 
     # set interactive plot
     if plot:
