@@ -112,7 +112,7 @@ class SelfAttn1d2(torch.nn.Module):
             fconv = x
             gconv = x
             hconv = x
-        fgconf = torch.einsum("ji,ik->jk", fconv, gconv)
+        fgconf = torch.einsum("aij,aik->ajk", fconv, gconv)
         fgconv = torch.bmm(fconv, gconv) # (nbatch, nsig, nsig)
         fgconv2 = self.softmax(fgconv)
         attn = torch.bmm(hconv, fgconv2) # (nbatch, ch, nsig)
