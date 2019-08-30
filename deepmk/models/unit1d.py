@@ -90,20 +90,29 @@ class SelfAttn1d(torch.nn.Module):
         return res
 
 class SelfAttn1d2(torch.nn.Module):
-    def __init__(self, ch):
+    def __init__(self, ch, och=None, with_conv=True):
         super(SelfAttn1d2, self).__init__()
-        och = 1 if ch // 8 < 1 else ch // 8
+        if och is None:
+            och = 1 if ch // 8 < 1 else ch // 8
 
-        self.fconv = torch.nn.Conv1d(in_channels=ch, out_channels=och, kernel_size=1)
-        self.gconv = torch.nn.Conv1d(in_channels=ch, out_channels=och, kernel_size=1)
-        self.hconv = torch.nn.Conv1d(in_channels=ch, out_channels= ch, kernel_size=1)
+        self.with_conv = with_conv
+        if with_conv:
+            self.fconv = torch.nn.Conv1d(in_channels=ch, out_channels=och, kernel_size=1)
+            self.gconv = torch.nn.Conv1d(in_channels=ch, out_channels=och, kernel_size=1)
+            self.hconv = torch.nn.Conv1d(in_channels=ch, out_channels= ch, kernel_size=1)
         self.gamma = torch.nn.Parameter(torch.zeros(1))
         self.softmax = torch.nn.Softmax(dim=-2)
 
     def forward(self, x):
-        fconv = self.fconv(x).permute(0,2,1) # (nbatch, nsig, och)
-        gconv = self.gconv(x) # (nbatch, och, nsig)
-        hconv = self.hconv(x) # (nbatch,  ch, nsig)
+        if self.with_conv:
+            fconv = self.fconv(x) # (nbatch, och, nsig).permute(0,2,1) # (nbatch, nsig, och)
+            gconv = self.gconv(x) # (nbatch, och, nsig)
+            hconv = self.hconv(x) # (nbatch,  ch, nsig)
+        else:
+            fconv = x
+            gconv = x
+            hconv = x
+        fgconf = torch.einsum("ji,ik->jk", fconv, gconv)
         fgconv = torch.bmm(fconv, gconv) # (nbatch, nsig, nsig)
         fgconv2 = self.softmax(fgconv)
         attn = torch.bmm(hconv, fgconv2) # (nbatch, ch, nsig)
