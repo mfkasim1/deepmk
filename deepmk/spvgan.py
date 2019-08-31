@@ -170,7 +170,7 @@ def train(m_model, g_model, d_model,
 
                 # maximizing score for the real signal
                 # minimizing score for the fake signal
-                if gan_criteria == "hinge"
+                if gan_criteria == "hinge":
                     d_loss_real = torch.clamp(1.0 - d_score_real, 0.0).mean()
                     d_loss_fake = torch.clamp(1.0 + d_score_fake, 0.0).mean()
 
