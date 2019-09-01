@@ -19,6 +19,7 @@ class SpectralNorm(nn.Module):
         super(SpectralNorm, self).__init__()
         self.module = module
         self.name = name
+        self.in_channels = self.module.in_channels
         self.power_iterations = power_iterations
         if not self._made_params():
             self._make_params()

@@ -22,6 +22,7 @@ def get_weights(*models):
 def train(m_model, g_model, d_model,
           z_size, dataloaders,
           m_opt, g_opt, d_opt,
+          mg_opt=None,
           m_sched=None, g_sched=None, d_sched=None,
           gan_criteria="hinge", spv_criteria="mse",
           num_epochs=25, device=None, verbose=1, plot=0,
@@ -58,6 +59,9 @@ def train(m_model, g_model, d_model,
             for the training, nothing for validation.
         m_opt, g_opt, d_opt (torch.optim optimizer):
             Optimizer class in training the m_model, g_model, d_model, resp.
+        mg_opt (torch.optim optimizer):
+            Optimizer class to train the generative model in minimizing the
+            loss spv function.
         m_sched, g_sched, d_sched (torch.optim.lr_scheduler object):
             Optimizer scheduler in training the m_model, g_model, d_model, resp.
             Default: None.
@@ -82,6 +86,8 @@ def train(m_model, g_model, d_model,
         best_model :
             The trained model with the lowest loss criterion during "val" phase
     """
+    lambda_gp = 10.0
+
     # get the device
     if device is None:
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -116,6 +122,9 @@ def train(m_model, g_model, d_model,
         if verbose >= 1:
             print("Epoch %d/%d" % (epoch+1, num_epochs))
             print("-"*10)
+
+        if verbose >= 2:
+            progress_disp = mkutils.ProgressDisplay()
 
         # to time the progress
         epoch_start_time = time.time()
@@ -154,6 +163,11 @@ def train(m_model, g_model, d_model,
             m_loss_total = 0.0
             ndata_total = 0
             for params, signal in dataloaders[phase]:
+                # write the progress bar
+                num_batches += 1
+                if verbose >= 2:
+                    progress_disp.show(num_batches, total_batches)
+
                 ndata = params.shape[0]
                 ndata_total += ndata
 
@@ -164,7 +178,7 @@ def train(m_model, g_model, d_model,
                 ################ train the discriminator ################
                 # calculate the d-scores for real and fake signals
                 d_score_real = d_model(signal)
-                z = torch.randn(z_size).to(device)
+                z = torch.randn((signal.shape[0], z_size)).to(device)
                 fake_signal = g_model(z)
                 d_score_fake = d_model(fake_signal)
 
@@ -173,6 +187,9 @@ def train(m_model, g_model, d_model,
                 if gan_criteria == "hinge":
                     d_loss_real = torch.clamp(1.0 - d_score_real, 0.0).mean()
                     d_loss_fake = torch.clamp(1.0 + d_score_fake, 0.0).mean()
+                elif gan_criteria == "wgan-gp":
+                    d_loss_real = -d_score_real.mean()
+                    d_loss_fake =  d_score_fake.mean()
 
                 # backprop the discriminator
                 d_loss = d_loss_fake + d_loss_real
@@ -180,6 +197,32 @@ def train(m_model, g_model, d_model,
                     d_opt.zero_grad()
                     d_loss.backward()
                     d_opt.step()
+
+                if gan_criteria == "wgan-gp":
+                    alpha = torch.rand(signal.shape[0],1,1).to(device).expand_as(signal)
+                    interpolated = torch.zeros_like(signal)
+                    interpolated.data = alpha * signal.data + (1-alpha) * fake_signal.data
+                    interpolated.requires_grad = True
+
+                    d_interp = d_model(interpolated)
+                    grad = torch.autograd.grad(
+                        outputs=d_interp,
+                        inputs=interpolated,
+                        grad_outputs=torch.ones(d_interp.size()).cuda(),
+                        retain_graph=True,
+                        create_graph=True,
+                        only_inputs=True)[0]
+
+                    grad = grad.view(grad.size(0), -1)
+                    grad_l2norm = torch.sqrt(torch.sum(grad*grad, dim=1))
+                    d_loss_gp = torch.mean((grad_l2norm-1)**2)
+
+                    # backward + optimize
+                    d_loss = lambda_gp * d_loss_gp
+                    d_opt.zero_grad()
+                    d_loss.backward()
+                    d_opt.step()
+
 
                 # clear the memory
                 del z
@@ -190,7 +233,7 @@ def train(m_model, g_model, d_model,
 
                 ################ train the discriminator ################
                 # generate fake signal
-                z = torch.randn(z_size).to(device)
+                z = torch.randn((signal.shape[0], z_size)).to(device)
                 fake_signal = g_model(z)
                 d_score_fake = d_model(fake_signal)
 
@@ -212,7 +255,6 @@ def train(m_model, g_model, d_model,
                 ################ train the mapper ################
                 # get the signal from the parameters
                 predict_signal = g_model(m_model(params))
-                print(predict_signal.shape, signal.shape) # DEBUG
 
                 # calculate the loss function
                 if spv_criteria == "mse":
@@ -222,8 +264,15 @@ def train(m_model, g_model, d_model,
                 # backprop the mapper model
                 if phase == "train":
                     m_opt.zero_grad()
+                    if mg_opt is not None:
+                        mg_opt.zero_grad()
+                        g_opt.zero_grad()
+
                     m_loss.backward()
                     m_opt.step()
+                    if mg_opt is not None:
+                        mg_opt.step()
+
 
                 # book keeping
                 m_loss_total += m_loss.data * ndata
