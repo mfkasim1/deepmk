@@ -168,9 +168,9 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
             # save the losses
             if phase == "train":
-                train_losses.append(crit_val)
+                train_losses.append(crit_val.data)
             elif phase == "val":
-                val_losses.append(crit_val)
+                val_losses.append(crit_val.data)
 
             # copy the best model
             if phase == "val" and epoch_loss < best_loss:
