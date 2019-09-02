@@ -168,7 +168,8 @@ def train(m_model, g_model, d_model,
                 if verbose >= 2:
                     progress_disp.show(num_batches, total_batches)
 
-                ndata = params.shape[0]
+                batch_size = params.shape[0]
+                ndata = batch_size
                 ndata_total += ndata
 
                 # load to device
@@ -180,7 +181,7 @@ def train(m_model, g_model, d_model,
                 d_score_real = d_model(signal)
                 z = torch.randn((signal.shape[0], z_size)).to(device)
                 fake_signal = g_model(z)
-                d_score_fake = d_model(fake_signal)
+                d_score_fake = d_model(fake_signal.detach())
 
                 # maximizing score for the real signal
                 # minimizing score for the fake signal
@@ -190,10 +191,16 @@ def train(m_model, g_model, d_model,
                 elif gan_criteria == "wgan-gp":
                     d_loss_real = -d_score_real.mean()
                     d_loss_fake =  d_score_fake.mean()
+                elif gan_criteria == "bce":
+                    real_label = torch.full((batch_size,), 1, device=device)
+                    fake_label = torch.full((batch_size,), 0, device=device)
+                    d_loss_real = torch.nn.BCELoss()(d_score_real, real_label)
+                    d_loss_fake = torch.nn.BCELoss()(d_score_fake, fake_label)
 
                 # backprop the discriminator
                 d_loss = d_loss_fake + d_loss_real
                 if phase == "train":
+                    d_model.zero_grad()
                     d_opt.zero_grad()
                     d_loss.backward()
                     d_opt.step()
@@ -223,25 +230,23 @@ def train(m_model, g_model, d_model,
                     d_loss.backward()
                     d_opt.step()
 
-
-                # clear the memory
-                del z
-
                 # book keeping
                 d_loss_real_total += d_loss_real.data * ndata
                 d_loss_fake_total += d_loss_fake.data * ndata
 
-                ################ train the discriminator ################
+                ################ train the generator ################
                 # generate fake signal
-                z = torch.randn((signal.shape[0], z_size)).to(device)
-                fake_signal = g_model(z)
                 d_score_fake = d_model(fake_signal)
 
                 # maximize the d-score for the fake signal
-                g_loss = -d_score_fake.mean()
+                if gan_criteria in ["hinge", "wgan-gp"]:
+                    g_loss = -d_score_fake.mean()
+                elif gan_criteria == "bce":
+                    g_loss = torch.nn.BCELoss()(d_score_fake, real_label)
 
                 # backprop the generative model
                 if phase == "train":
+                    g_model.zero_grad()
                     g_opt.zero_grad()
                     g_loss.backward()
                     g_opt.step()
@@ -263,8 +268,10 @@ def train(m_model, g_model, d_model,
 
                 # backprop the mapper model
                 if phase == "train":
+                    m_model.zero_grad()
                     m_opt.zero_grad()
                     if mg_opt is not None:
+                        g_model.zero_grad()
                         mg_opt.zero_grad()
                         g_opt.zero_grad()
 
