@@ -293,7 +293,7 @@ def train(m_model, g_model, d_model,
 
             # copy the best model
             if phase == "val" and m_loss_mean[phase] < best_loss:
-                best_loss = m_loss_mean[phase]
+                best_loss = m_loss_mean[phase].data
                 best_model_weights = get_weights(m_model, g_model, d_model)
 
                 # save the model
@@ -304,7 +304,7 @@ def train(m_model, g_model, d_model,
 
         # print the message
         if verbose > 0:
-            print("Done in %fs" % (time.time() - since))
+            print("Done in %fs (best val loss: %.3e)" % (time.time() - since, best_loss))
             print("D-loss real: (train) %.3e, (val) %.3e" % \
                 (d_loss_real_mean["train"], d_loss_real_mean["val"]))
             print("D-loss fake: (train) %.3e, (val) %.3e" % \

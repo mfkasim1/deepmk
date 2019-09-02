@@ -174,7 +174,7 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
             # copy the best model
             if phase == "val" and epoch_loss < best_loss:
-                best_loss = epoch_loss
+                best_loss = epoch_loss.data
                 best_model_weights = copy.deepcopy(model.state_dict())
 
                 # save the model
@@ -185,10 +185,10 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
         # show the loss in the current epoch
         if verbose >= 1:
-            print("train %s: %.4e, val %s: %.4e, done in %fs" % \
+            print("train %s: %.4e, val %s: %.4e, done in %fs (best val: %.3e)" % \
                   (criteria["train"].name, train_losses[-1],
                    criteria["val"].name, val_losses[-1],
-                   time.time()-since))
+                   time.time()-since, best_loss))
         # plot the losses
         if plot:
             xs_plot = range(1,epoch+2)
