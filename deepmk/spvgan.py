@@ -26,7 +26,7 @@ def train(m_model, g_model, d_model,
           m_sched=None, g_sched=None, d_sched=None,
           gan_criteria="hinge", spv_criteria="mse",
           num_epochs=25, device=None, verbose=1, plot=0,
-          save_wts_to=None):
+          save_wts_to=None, return_history=False):
     """
     Performs a supervised + GAN training procedure. The generative and
     discriminative models are trained with GAN procedure while the mapper
@@ -81,6 +81,9 @@ def train(m_model, g_model, d_model,
         save_wts_to (str):
             Name of a file to save the best model's weights. If None, then do not
             save. (default: None)
+        return_history (bool):
+            A flag to indicate whether the training and validation losses history
+            will be returned. (default: False)
 
     Returns:
         best_model :
@@ -117,6 +120,15 @@ def train(m_model, g_model, d_model,
     g_loss_mean = {"train":0.0, "val":0.0}
     m_loss_mean = {"train":0.0, "val":0.0}
 
+    if return_history:
+        d_losses_real_train = []
+        d_losses_fake_train = []
+        g_losses_train = []
+        m_losses_train = []
+        d_losses_real_val = []
+        d_losses_fake_val = []
+        g_losses_val = []
+        m_losses_val = []
     total_batches = len(dataloaders["train"]) + len(dataloaders["val"])
     for epoch in range(num_epochs):
         if verbose >= 1:
@@ -314,6 +326,16 @@ def train(m_model, g_model, d_model,
             print("M-loss     : (train) %.3e, (val) %.3e" % \
                 (m_loss_mean["train"], m_loss_mean["val"]))
 
+        if return_history:
+            d_losses_real_train.append(d_loss_real_mean["train"].data)
+            d_losses_fake_train.append(d_loss_fake_mean["train"].data)
+            g_losses_train.append(g_loss_mean["train"].data)
+            m_losses_train.append(m_loss_mean["train"].data)
+            d_losses_real_val.append(d_loss_real_mean["val"].data)
+            d_losses_fake_val.append(d_loss_fake_mean["val"].data)
+            g_losses_val.append(g_loss_mean["val"].data)
+            m_losses_val.append(m_loss_mean["val"].data)
+
     # finish all epochs
     if verbose >= 1:
         time_elapsed = time.time() - since
@@ -324,4 +346,8 @@ def train(m_model, g_model, d_model,
     m_model.load_state_dict(best_model_weights[0])
     g_model.load_state_dict(best_model_weights[1])
     d_model.load_state_dict(best_model_weights[2])
+    if return_history:
+        return m_model, g_model, d_model, best_loss, \
+               d_losses_real_train, d_losses_fake_train, g_losses_train, m_losses_train, \
+               d_losses_real_val, d_losses_fake_val, g_losses_val, m_losses_val
     return m_model, g_model, d_model, best_loss

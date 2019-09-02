@@ -18,7 +18,7 @@ __all__ = ["train"]
 
 def train(model, dataloaders, criteria, optimizer, scheduler=None,
           num_epochs=25, device=None, verbose=1, plot=0, save_wts_to=None,
-          save_model_to=None):
+          save_model_to=None, return_history=False):
     """
     Performs a training of the model.
 
@@ -60,6 +60,9 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
         save_model_to (str):
             Name of a file to save the best whole model. If None, then do not save.
             (default: None)
+        return_history (bool):
+            A flag to indicate whether the training and validation losses history
+            will be returned. (default: False)
 
     Returns:
         best_model :
@@ -209,6 +212,8 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
     # load the best model
     model.load_state_dict(best_model_weights)
+    if return_history:
+        return model, best_loss, train_losses, val_losses
     return model, best_loss
 
 def validate(model, dataloader, val_criterion, device=None, verbose=1,
