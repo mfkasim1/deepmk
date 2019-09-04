@@ -102,108 +102,111 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
     val_losses = []
 
     total_batches = len(dataloaders["train"]) + len(dataloaders["val"])
-    for epoch in range(num_epochs):
-        if verbose >= 1:
-            print("Epoch %d/%d" % (epoch+1, num_epochs))
-            print("-"*10)
+    try:
+        for epoch in range(num_epochs):
+            if verbose >= 1:
+                print("Epoch %d/%d" % (epoch+1, num_epochs))
+                print("-"*10)
 
-        # to time the progress
-        epoch_start_time = time.time()
+            # to time the progress
+            epoch_start_time = time.time()
 
-        # progress counter
-        num_batches = 0 # num batches in training and validation
-        if verbose >= 2:
-            progress_disp = mkutils.ProgressDisplay()
+            # progress counter
+            num_batches = 0 # num batches in training and validation
+            if verbose >= 2:
+                progress_disp = mkutils.ProgressDisplay()
 
-        # every epoch has a training and a validation phase
-        for phase in ["train", "val"]:
+            # every epoch has a training and a validation phase
+            for phase in ["train", "val"]:
 
-            # skip phase if the dataloaders for the current phase is empty
-            if dataloaders[phase] == []: continue
+                # skip phase if the dataloaders for the current phase is empty
+                if dataloaders[phase] == []: continue
 
-            # set the model's mode
-            if phase == "train":
-                if scheduler is not None:
-                    scheduler.step() # adjust the training learning rate
-                model.train() # set the model to the training mode
-            else:
-                model.eval() # set the model to the evaluation mode
+                # set the model's mode
+                if phase == "train":
+                    if scheduler is not None:
+                        scheduler.step() # adjust the training learning rate
+                    model.train() # set the model to the training mode
+                else:
+                    model.eval() # set the model to the evaluation mode
 
-            # the total loss during this epoch
-            running_loss = 0.0
+                # the total loss during this epoch
+                running_loss = 0.0
 
-            # iterate over the data
-            dataset_size = 0
+                # iterate over the data
+                dataset_size = 0
 
-            # reset the criteria before the training epoch starts
-            criteria[phase].reset()
-            for inputs, labels in dataloaders[phase]:
-                # get the size of the dataset
-                dataset_size += inputs.size(0)
-                num_batches += 1
+                # reset the criteria before the training epoch starts
+                criteria[phase].reset()
+                for inputs, labels in dataloaders[phase]:
+                    # get the size of the dataset
+                    dataset_size += inputs.size(0)
+                    num_batches += 1
 
-                # write the progress bar
-                if verbose >= 2:
-                    progress_disp.show(num_batches, total_batches)
+                    # write the progress bar
+                    if verbose >= 2:
+                        progress_disp.show(num_batches, total_batches)
 
-                # load the inputs and the labels to the working device
-                inputs = inputs.to(device)
-                labels = labels.to(device)
+                    # load the inputs and the labels to the working device
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
 
-                # reset the model gradient to 0
-                optimizer.zero_grad()
+                    # reset the model gradient to 0
+                    optimizer.zero_grad()
 
-                # forward
-                # track history if only in train
-                with torch.set_grad_enabled(phase == "train"):
-                    outputs = model(inputs)
-                    loss = criteria[phase].feed(outputs, labels)
+                    # forward
+                    # track history if only in train
+                    with torch.set_grad_enabled(phase == "train"):
+                        outputs = model(inputs)
+                        loss = criteria[phase].feed(outputs, labels)
 
-                    # backward gradient computation and optimize in training
-                    if phase == "train":
-                        loss.backward()
-                        optimizer.step()
+                        # backward gradient computation and optimize in training
+                        if phase == "train":
+                            loss.backward()
+                            optimizer.step()
 
-            # get the mean loss in this epoch
-            mult = -1 if (criteria[phase].best == "max") else 1
-            crit_val = criteria[phase].getval()
-            epoch_loss = mult * crit_val
+                # get the mean loss in this epoch
+                mult = -1 if (criteria[phase].best == "max") else 1
+                crit_val = criteria[phase].getval()
+                epoch_loss = mult * crit_val
 
-            # save the losses
-            if phase == "train":
-                train_losses.append(crit_val.data)
-            elif phase == "val":
-                val_losses.append(crit_val.data)
+                # save the losses
+                if phase == "train":
+                    train_losses.append(crit_val.data)
+                elif phase == "val":
+                    val_losses.append(crit_val.data)
 
-            # copy the best model
-            if phase == "val" and epoch_loss < best_loss:
-                best_loss = epoch_loss.data
-                best_model_weights = copy.deepcopy(model.state_dict())
+                # copy the best model
+                if phase == "val" and epoch_loss < best_loss:
+                    best_loss = epoch_loss.data
+                    best_model_weights = copy.deepcopy(model.state_dict())
 
-                # save the model
-                if save_model_to is not None:
-                    mkutils.save(model, save_model_to)
-                if save_wts_to is not None:
-                    mkutils.save(model.state_dict(), save_wts_to)
+                    # save the model
+                    if save_model_to is not None:
+                        mkutils.save(model, save_model_to)
+                    if save_wts_to is not None:
+                        mkutils.save(model.state_dict(), save_wts_to)
 
-        # show the loss in the current epoch
-        if verbose >= 1:
-            print("train %s: %.4e, val %s: %.4e, done in %fs (best val: %.3e)" % \
-                  (criteria["train"].name, train_losses[-1],
-                   criteria["val"].name, val_losses[-1],
-                   time.time()-since, best_loss))
-        # plot the losses
-        if plot:
-            xs_plot = range(1,epoch+2)
-            plt.clf()
-            plt.plot(xs_plot, train_losses, 'o-')
-            plt.plot(xs_plot, val_losses, 'o-')
-            plt.legend(["Train", "Validation"])
-            plt.xlabel("Epoch")
-            plt.ylabel("Loss")
-            plt.pause(0.001)
+            # show the loss in the current epoch
+            if verbose >= 1:
+                print("train %s: %.4e, val %s: %.4e, done in %fs (best val: %.3e)" % \
+                      (criteria["train"].name, train_losses[-1],
+                       criteria["val"].name, val_losses[-1],
+                       time.time()-since, best_loss))
+            # plot the losses
+            if plot:
+                xs_plot = range(1,epoch+2)
+                plt.clf()
+                plt.plot(xs_plot, train_losses, 'o-')
+                plt.plot(xs_plot, val_losses, 'o-')
+                plt.legend(["Train", "Validation"])
+                plt.xlabel("Epoch")
+                plt.ylabel("Loss")
+                plt.pause(0.001)
 
-        print("")
+            print("")
+    except KeyboardInterrupt:
+        print("Interrupted. Returning the results.")
 
     if verbose >= 1:
         time_elapsed = time.time()- since
