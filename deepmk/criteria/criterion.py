@@ -54,7 +54,7 @@ class MeanCriterion(Criterion):
     def feed(self, preds, targets):
         size = len(targets) * 1.0
         val = self.criterion(preds, targets)
-        self.crit_sum += val * size
+        self.crit_sum += val.data * size
         self.crit_num += size
         return val
 
