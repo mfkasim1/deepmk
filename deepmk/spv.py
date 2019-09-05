@@ -40,11 +40,14 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
             object to calculate the mean criterion.
             The criterion for the training needs to be differentiable and it
             will be minimized during the training.
-        optimizer (torch.optim optimizer):
-            Optimizer class in training the model.
-        scheduler (torch.optim.lr_scheduler object):
+        optimizer (torch.optim optimizer or dict):
+            Optimizer class in training the model. If it is a dictionary, it
+            must have "train" and "val" keys and it makes it a meta-learning
+            problem.
+        scheduler (torch.optim.lr_scheduler object or dict):
             Scheduler of how the learning rate is evolving through the epochs. If it
-            is None, it does not update the learning rate. (default: None)
+            is None, it does not update the learning rate. It can be a dictionary
+            like the optimizer argument. (default: None)
         num_epochs (int):
             The number of epochs in training. (default: 25)
         device :
@@ -73,6 +76,10 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("Using device:")
     print(device)
+
+    # check optimizer and scheduler types and decide if this is a meta
+    # learning problem
+    metalearning = _check_opt_sched(optimizer, scheduler)
 
     # set interactive plot
     if plot:
@@ -123,12 +130,17 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                 if dataloaders[phase] == []: continue
 
                 # set the model's mode
-                if phase == "train":
-                    if scheduler is not None:
-                        scheduler.step() # adjust the training learning rate
-                    model.train() # set the model to the training mode
+                if not metalearning:
+                    if phase == "train":
+                        if scheduler is not None:
+                            scheduler.step() # adjust the training learning rate
+                        model.train() # set the model to the training mode
+                    else:
+                        model.eval() # set the model to the evaluation mode
                 else:
-                    model.eval() # set the model to the evaluation mode
+                    if scheduler is not None:
+                        scheduler[phase].step()
+                    model.train()
 
                 # the total loss during this epoch
                 running_loss = 0.0
@@ -152,18 +164,27 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                     labels = labels.to(device)
 
                     # reset the model gradient to 0
-                    optimizer.zero_grad()
+                    if not metalearning:
+                        optimizer.zero_grad()
+                    else:
+                        optimizer["train"].zero_grad()
+                        optimizer["val"].zero_grad()
 
                     # forward
                     # track history if only in train
-                    with torch.set_grad_enabled(phase == "train"):
+                    grad_enabled = (phase == "train" and not metalearning)
+                    with torch.set_grad_enabled(grad_enabled):
                         outputs = model(inputs)
                         loss = criteria[phase].feed(outputs, labels)
 
                         # backward gradient computation and optimize in training
-                        if phase == "train":
+                        if not metalearning:
+                            if phase == "train":
+                                loss.backward()
+                                optimizer.step()
+                        else:
                             loss.backward()
-                            optimizer.step()
+                            optimizer[phase].step()
 
                 # get the mean loss in this epoch
                 mult = -1 if (criteria[phase].best == "max") else 1
@@ -261,3 +282,29 @@ def validate(model, dataloader, val_criterion, device=None, verbose=1,
     print("Validation with %s criterion: %e" %
           (val_criterion.name, val_criterion.getval()))
     return float(val_criterion.getval())
+
+def _check_opt_sched(opt, sched):
+    if sched is not None:
+        if type(opt) == dict and type(sched) == dict:
+            if "val" in opt and "val" in sched and \
+               "train" in opt and "train" in sched:
+                metalearning = True
+            else:
+                raise ValueError("optimizer and scheduler arguments must "
+                                 "have 'train' and 'val' keys in them")
+        elif type(opt) != dict and type(sched) != dict:
+            metalearning = False
+        else:
+            raise ValueError("optimizer and scheduler must be both non "
+                             "dictionary or dictionary")
+    else:
+        if type(opt) == dict:
+            if "val" in opt and "train" in opt:
+                metalearning = True
+            else:
+                raise ValueError("If optimizer is a dictionary, it must have "
+                                 "'train' and 'val' keys in it")
+        else:
+            metalearning = False
+
+    return metalearning
