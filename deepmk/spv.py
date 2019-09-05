@@ -80,6 +80,8 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
     # check optimizer and scheduler types and decide if this is a meta
     # learning problem
     metalearning = _check_opt_sched(optimizer, scheduler)
+    if metalearning and verbose >= 1:
+        print("We are doing meta-learning")
 
     # set interactive plot
     if plot:
