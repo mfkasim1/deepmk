@@ -18,7 +18,7 @@ __all__ = ["train"]
 
 def train(model, dataloaders, criteria, optimizer, scheduler=None,
           num_epochs=25, device=None, verbose=1, plot=0, save_wts_to=None,
-          save_model_to=None, return_history=False, return_best=True):
+          save_model_to=None, return_history=False, return_best_last=9e99):
     """
     Performs a training of the model.
 
@@ -66,9 +66,9 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
         return_history (bool):
             A flag to indicate whether the training and validation losses history
             will be returned. (default: False)
-        return_best (bool):
-            If True, it will return the model with the lowest validation
-            criteria. Otherwise, it will return the last model. (default: True)
+        return_best_last (int):
+            Return the best model over the last `return_best_last` epochs.
+            (default: 9e99)
 
     Returns:
         best_model :
@@ -115,6 +115,7 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
     total_batches = len(dataloaders["train"]) + len(dataloaders["val"])
     try:
+        best_epoch = 0
         for epoch in range(num_epochs):
             if verbose >= 1:
                 print("Epoch %d/%d" % (epoch+1, num_epochs))
@@ -203,7 +204,10 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                     val_losses.append(crit_val.data)
 
                 # copy the best model
-                if phase == "val" and epoch_loss < best_loss:
+                if phase == "val" and \
+                        ((epoch_loss < best_loss) or \
+                         (epoch - best_epoch >= return_best_last)):
+                    best_epoch = epoch
                     best_loss = epoch_loss.data
                     best_model_weights = copy.deepcopy(model.state_dict())
 
@@ -235,11 +239,6 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
         time_elapsed = time.time()- since
         print("Training complete in %fs" % time_elapsed)
         print("Best val loss: %.4f" % best_loss)
-
-    # return the last model
-    if not return_best:
-        _save_model(model, save_model_to, save_wts_to)
-        best_loss = val_losses[-1]
 
     # return the model
     model.load_state_dict(best_model_weights)
