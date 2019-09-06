@@ -18,7 +18,7 @@ __all__ = ["train"]
 
 def train(model, dataloaders, criteria, optimizer, scheduler=None,
           num_epochs=25, device=None, verbose=1, plot=0, save_wts_to=None,
-          save_model_to=None, return_history=False):
+          save_model_to=None, return_history=False, return_best=True):
     """
     Performs a training of the model.
 
@@ -66,6 +66,9 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
         return_history (bool):
             A flag to indicate whether the training and validation losses history
             will be returned. (default: False)
+        return_best (bool):
+            If True, it will return the model with the lowest validation
+            criteria. Otherwise, it will return the last model. (default: True)
 
     Returns:
         best_model :
@@ -205,10 +208,7 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                     best_model_weights = copy.deepcopy(model.state_dict())
 
                     # save the model
-                    if save_model_to is not None:
-                        mkutils.save(model, save_model_to)
-                    if save_wts_to is not None:
-                        mkutils.save(model.state_dict(), save_wts_to)
+                    _save_model(model, save_model_to, save_wts_to)
 
             # show the loss in the current epoch
             if verbose >= 1:
@@ -236,7 +236,12 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
         print("Training complete in %fs" % time_elapsed)
         print("Best val loss: %.4f" % best_loss)
 
-    # load the best model
+    # return the last model
+    if not return_best:
+        _save_model(model, save_model_to, save_wts_to)
+        best_loss = val_losses[-1]
+
+    # return the model
     model.load_state_dict(best_model_weights)
     if return_history:
         return model, best_loss, train_losses, val_losses
@@ -310,3 +315,9 @@ def _check_opt_sched(opt, sched):
             metalearning = False
 
     return metalearning
+
+def _save_model(model, save_model_to, save_wts_to):
+    if save_model_to is not None:
+        mkutils.save(model, save_model_to)
+    if save_wts_to is not None:
+        mkutils.save(model.state_dict(), save_wts_to)
