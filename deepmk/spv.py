@@ -174,7 +174,7 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
                     # forward
                     # track history if only in train
-                    grad_enabled = (phase == "train" and not metalearning)
+                    grad_enabled = (phase == "train" or metalearning)
                     with torch.set_grad_enabled(grad_enabled):
                         outputs = model(inputs)
                         loss = criteria[phase].feed(outputs, labels)
