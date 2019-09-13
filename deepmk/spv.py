@@ -102,6 +102,10 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
             criteria[phase] = deepmk.criteria.MeanCriterion(criteria[phase])
         criteria[phase].reset()
 
+    # prepare the memory of the last best weights
+    if return_best_last < num_epochs:
+        weights_history = [None for _ in range(return_best_last)]
+
     # load the model to the device first
     model = model.to(device)
 
@@ -203,16 +207,31 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                 elif phase == "val":
                     val_losses.append(crit_val.data)
 
+                # save the model history
+                if return_best_last < num_epochs:
+                    weights_history[epoch % return_best_last] = copy.deepcopy(model.state_dict())
+
                 # copy the best model
                 if phase == "val" and \
                         ((epoch_loss < best_loss) or \
-                         (epoch - best_epoch >= return_best_last)):
-                    best_epoch = epoch
-                    best_loss = epoch_loss.data
-                    best_model_weights = copy.deepcopy(model.state_dict())
+                         (epoch - best_epoch > return_best_last)):
+                    if epoch - best_epoch > return_best_last:
+                        # get the index of the next best last
+                        val_losses_n = val_losses[-return_best_last:]
+                        min_idx_rel = np.argmin(val_losses_n)
+                        min_idx = min_idx_rel + len(val_losses) - return_best_last
+
+                        # get the best conditions
+                        best_epoch = min_idx
+                    else:
+                        best_epoch = epoch
+
+                    # save the best conditions
+                    best_loss = val_losses[best_epoch]
+                    best_model_weights = weights_history[min_idx % return_best_last]
 
                     # save the model
-                    _save_model(model, save_model_to, save_wts_to)
+                    _save_wts(best_model_weights, save_wts_to)
 
             # show the loss in the current epoch
             if verbose >= 1:
@@ -315,8 +334,6 @@ def _check_opt_sched(opt, sched):
 
     return metalearning
 
-def _save_model(model, save_model_to, save_wts_to):
-    if save_model_to is not None:
-        mkutils.save(model, save_model_to)
+def _save_wts(wts, save_wts_to):
     if save_wts_to is not None:
-        mkutils.save(model.state_dict(), save_wts_to)
+        mkutils.save(wts, save_wts_to)
