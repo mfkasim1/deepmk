@@ -228,7 +228,7 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
                     # save the best conditions
                     best_loss = val_losses[best_epoch]
-                    best_model_weights = weights_history[min_idx % return_best_last]
+                    best_model_weights = weights_history[best_epoch % return_best_last]
 
                     # save the model
                     _save_wts(best_model_weights, save_wts_to)
