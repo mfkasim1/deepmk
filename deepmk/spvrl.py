@@ -19,8 +19,7 @@ __all__ = ["train"]
 
 def train(model, dataloaders, criteria, optimizer, scheduler=None,
           num_epochs=25, device=None, verbose=1, plot=0, save_wts_to=None,
-          save_model_to=None, return_history=False, return_best_last=9e99,
-          memory_size=0, memory_step=0):
+          save_model_to=None, return_history=False, return_best_last=9e99):
     """
     Performs a training of the model.
 
@@ -72,11 +71,6 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
         return_best_last (int):
             Return the best model over the last `return_best_last` epochs.
             (default: 9e99)
-        memory_size (int):
-            Size of the replay memory. (default: 0)
-        memory_step (int):
-            The number of learning steps to be taken from the replay memory.
-            (default: 0)
 
     Returns:
         best_model :
@@ -124,13 +118,6 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
     val_losses = []
 
     total_batches = len(dataloaders["train"]) + len(dataloaders["val"])
-
-    # set up the replay memory
-    if memory_size > 0:
-        rmem_losses = torch.zeros(memory_size).to(device)
-        rmem_logps = torch.zeros(memory_size).to(device)
-        memidx = 0
-        memfilled = 0
     try:
         best_epoch = 0
         for epoch in range(num_epochs):
@@ -209,46 +196,8 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                     # is only done once, so we want to make it larger
                     # (it is approximately mean, but doing it for every batch)
                     loss = (normlosses * logps).sum()
-                    rg = memory_step > 0 and memory_size > 0
-                    loss.backward(retain_graph=rg)
+                    loss.backward()
                     optimizer[phase].step()
-
-                    # pick some from replay memory randomly
-                    if rg:
-                        num_to_pick = len(losses)
-                        num_memory = np.minimum(memory_size, memfilled)
-                        print(num_memory)
-                        memstep = np.minimum(memory_step, num_memory // num_to_pick)
-                        for _ in range(memstep):
-                            # get the index from the replay memory to pick
-                            mem_probs = torch.zeros(num_memory) + 1./num_memory
-                            idx_pick = torch.multinomial(mem_probs, num_to_pick)
-
-                            # calculate the loss function from the replay memory
-                            rm_losses = rmem_losses[idx_pick]
-                            rm_logps = rmem_logps[idx_pick]
-                            norm_losses = get_normloss(rm_losses)
-                            rm_loss = (norm_losses * rm_logps).sum()
-
-                            # do the step
-                            optimizer[phase].zero_grad()
-                            rm_loss.backward(retain_graph=True)
-                            optimizer[phase].step()
-
-                        # save the new losses and logps to the replay memory
-                        if memidx + len(losses) <= memory_size:
-                            rmem_losses[memidx:memidx+len(losses)] = losses
-                            rmem_logps[memidx:memidx+len(losses)] = logps
-                            memidx += len(losses)
-                        elif memory_size > 0:
-                            remsize = memory_size - memidx
-                            rem2size = len(losses) - remsize
-                            rmem_losses[memidx:] = losses[:remsize]
-                            rmem_logps[memidx:] = logps[:remsize]
-                            rmem_losses[:rem2size] = losses[remsize:]
-                            rmem_logps[:rem2size] = logps[remsize:]
-                            memidx = rem2size
-                        memfilled += len(losses)
 
                 # get the mean loss in this epoch
                 mult = -1 if (criteria[phase].best == "max") else 1
