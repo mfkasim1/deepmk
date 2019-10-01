@@ -19,7 +19,8 @@ __all__ = ["train"]
 
 def train(model, dataloaders, criteria, optimizer, scheduler=None,
           num_epochs=25, device=None, verbose=1, plot=0, save_wts_to=None,
-          save_model_to=None, return_history=False, return_best_last=9e99):
+          save_model_to=None, return_history=False, return_best_last=9e99,
+          revert_every=9e99):
     """
     Performs a training of the model.
 
@@ -70,6 +71,10 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
             will be returned. (default: False)
         return_best_last (int):
             Return the best model over the last `return_best_last` epochs.
+            (default: 9e99)
+        revert_every (int):
+            Revert the model to the best model every this steps when the better
+            is not found.
             (default: 9e99)
 
     Returns:
@@ -217,7 +222,8 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                 # copy the best model
                 if phase == "val" and \
                         ((epoch_loss < best_loss) or \
-                         (epoch - best_epoch > return_best_last)):
+                         (epoch - best_epoch > return_best_last) or \
+                         (epoch - best_epoch > revert_every)):
                     if epoch - best_epoch > return_best_last:
                         # get the index of the next best last
                         val_losses_n = val_losses[-return_best_last:]
@@ -226,12 +232,18 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
                         # get the best conditions
                         best_epoch = min_idx
+                        best_model_weights = weights_history[best_epoch % return_best_last]
+
+                    elif epoch - best_epoch > revert_every:
+                        # revert the model to the best model
+                        model.load_state_dict(best_model_weights)
+
                     else:
                         best_epoch = epoch
+                        best_model_weights = copy.deepcopy(model.state_dict())
 
                     # save the best conditions
                     best_loss = val_losses[best_epoch]
-                    best_model_weights = weights_history[best_epoch % return_best_last]
 
                     # save the model
                     _save_wts(best_model_weights, save_wts_to)

@@ -19,11 +19,11 @@ __all__ = ["train"]
 def get_weights(*models):
     return copy.deepcopy([m.state_dict() for m in models])
 
-def train(m_model, g_model, d_model,
-          z_size, dataloaders,
-          m_opt, g_opt, d_opt,
-          mg_opt=None,
-          m_sched=None, g_sched=None, d_sched=None,
+def train(g_model, d_model,
+          dataloaders, lambda_g,
+          g_opt, d_opt,
+          train_g_after=0,
+          g_sched=None, d_sched=None,
           gan_criteria="hinge", spv_criteria="mse",
           num_epochs=25, device=None, verbose=1, plot=0,
           save_wts_to=None, return_history=False):
@@ -37,33 +37,27 @@ def train(m_model, g_model, d_model,
     In one training batch:
     * `d_model` is trained by maximizing d-score for real and minimizing for
                 fake signal.
-    * `g_model` is trained by maximizing d-score for its generated signal.
-    * `m_model` is trained by minimizing loss value from the dataset.
+    * `g_model` is trained by maximizing d-score for its generated signal and
+                minimizing from the supervised data.
 
     Args:
-        m_model :
-            A torch trainable mapper model to map from parameters space to the
-            latent space.
         g_model :
-            A torch trainable generative model from the latent space to the
+            A torch trainable generative model from the parameters space to the
             signal space.
         d_model :
             A torch trainable discriminative model that receives the signal
             as the input and gives low score for fake and high score for real.
-        z_size (int) :
-            The size of the latent variables for the generative model.
         dataloaders (dict or torch.utils.data.DataLoader):
             Dictionary with two keys: ["train", "val"] with every value is an
             iterable with two outputs: (1) the "inputs" to the model and (2) the
             ground truth of the "outputs". If it is a DataLoader, then it's only
             for the training, nothing for validation.
-        m_opt, g_opt, d_opt (torch.optim optimizer):
-            Optimizer class in training the m_model, g_model, d_model, resp.
-        mg_opt (torch.optim optimizer):
-            Optimizer class to train the generative model in minimizing the
-            loss spv function.
-        m_sched, g_sched, d_sched (torch.optim.lr_scheduler object):
-            Optimizer scheduler in training the m_model, g_model, d_model, resp.
+        lambda_g (float):
+            The penalty factor of the discriminator regularization.
+        g_opt, d_opt (torch.optim optimizer):
+            Optimizer class in training the g_model and d_model, resp.
+        g_sched, d_sched (torch.optim.lr_scheduler object):
+            Optimizer scheduler in training the g_model, d_model, resp.
             Default: None.
         gan_criteria (str, optional):
             Criteria in training GAN. For now, the option is only "hinge".
@@ -102,13 +96,12 @@ def train(m_model, g_model, d_model,
         dataloaders = {"train": dataloaders, "val": []}
 
     # load the model to the device first
-    m_model = m_model.to(device)
     g_model = g_model.to(device)
     d_model = d_model.to(device)
 
     if verbose >= 1:
         since = time.time()
-    best_model_weights = get_weights(m_model, g_model, d_model)
+    best_model_weights = get_weights(g_model, d_model)
     best_loss = np.inf
 
     train_losses = []
@@ -154,17 +147,15 @@ def train(m_model, g_model, d_model,
 
             # set the model's mode
             if phase == "train":
-                if m_sched is not None:
-                    m_sched.step() # adjust the training learning rate
                 if g_sched is not None:
                     g_sched.step()
                 if d_sched is not None:
                     d_sched.step()
-                m_model.train() # set the model to the training mode
+                # set the model to the training mode
                 g_model.train()
                 d_model.train()
             else:
-                m_model.eval() # set the model to the evaluation mode
+                # set the model to the evaluation mode
                 g_model.eval()
                 d_model.eval()
 
@@ -191,7 +182,7 @@ def train(m_model, g_model, d_model,
                 ################ train the discriminator ################
                 # calculate the d-scores for real and fake signals
                 d_score_real = d_model(signal)
-                z = torch.randn((signal.shape[0], z_size)).to(device)
+                z = torch.rand((params.shape[0], params.shape[1])).to(device)
                 fake_signal = g_model(z)
                 d_score_fake = d_model(fake_signal.detach())
 
@@ -256,42 +247,32 @@ def train(m_model, g_model, d_model,
                 elif gan_criteria == "bce":
                     g_loss = torch.nn.BCELoss()(d_score_fake, real_label)
 
-                # backprop the generative model
-                if phase == "train":
-                    g_model.zero_grad()
-                    g_opt.zero_grad()
-                    g_loss.backward()
-                    g_opt.step()
-
-                # clear the memory
-                del z
-
                 # book keeping
                 g_loss_total += g_loss.data * ndata
 
                 ################ train the mapper ################
                 # get the signal from the parameters
-                predict_signal = g_model(m_model(params))
+                predict_signal = g_model(params)
 
                 # calculate the loss function
                 if spv_criteria == "mse":
                     sig_err = (predict_signal - signal)
                     m_loss = (sig_err * sig_err).mean()
 
+                # calculate the total loss function that the generator will be
+                # trained on
+                if epoch >= train_g_after:
+                    mg_loss = m_loss + lambda_g * g_loss
+                else:
+                    mg_loss = m_loss
+
                 # backprop the mapper model
                 if phase == "train":
-                    m_model.zero_grad()
-                    m_opt.zero_grad()
-                    if mg_opt is not None:
-                        g_model.zero_grad()
-                        mg_opt.zero_grad()
-                        g_opt.zero_grad()
+                    g_model.zero_grad()
+                    g_opt.zero_grad()
 
-                    m_loss.backward()
-                    m_opt.step()
-                    if mg_opt is not None:
-                        mg_opt.step()
-
+                    mg_loss.backward()
+                    g_opt.step()
 
                 # book keeping
                 m_loss_total += m_loss.data * ndata
@@ -306,7 +287,7 @@ def train(m_model, g_model, d_model,
             # copy the best model
             if phase == "val" and m_loss_mean[phase] < best_loss:
                 best_loss = m_loss_mean[phase].data
-                best_model_weights = get_weights(m_model, g_model, d_model)
+                best_model_weights = get_weights(g_model, d_model)
 
                 # save the model
                 if save_wts_to is not None:
@@ -343,11 +324,10 @@ def train(m_model, g_model, d_model,
         print("Best val loss: %.4f" % best_loss)
 
     # load the best models
-    m_model.load_state_dict(best_model_weights[0])
-    g_model.load_state_dict(best_model_weights[1])
-    d_model.load_state_dict(best_model_weights[2])
+    g_model.load_state_dict(best_model_weights[0])
+    d_model.load_state_dict(best_model_weights[1])
     if return_history:
-        return m_model, g_model, d_model, best_loss, \
+        return g_model, d_model, best_loss, \
                d_losses_real_train, d_losses_fake_train, g_losses_train, m_losses_train, \
                d_losses_real_val, d_losses_fake_val, g_losses_val, m_losses_val
-    return m_model, g_model, d_model, best_loss
+    return g_model, d_model, best_loss

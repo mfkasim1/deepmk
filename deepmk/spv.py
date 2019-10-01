@@ -223,12 +223,13 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
 
                         # get the best conditions
                         best_epoch = min_idx
+                        best_model_weights = weights_history[best_epoch % return_best_last]
                     else:
                         best_epoch = epoch
+                        best_model_weights = copy.deepcopy(model.state_dict())
 
                     # save the best conditions
                     best_loss = val_losses[best_epoch]
-                    best_model_weights = weights_history[best_epoch % return_best_last]
 
                     # save the model
                     _save_wts(best_model_weights, save_wts_to)
