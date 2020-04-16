@@ -18,9 +18,10 @@ optimize the validation data by REINFORCE.
 __all__ = ["train"]
 
 def train(model, dataloaders, criteria, optimizer, scheduler=None,
+          dvbatch=1,
           num_epochs=25, device=None, verbose=1, plot=0, save_wts_to=None,
           save_model_to=None, return_history=False, return_best_last=9e99,
-          revert_every=9e99):
+          revert_every=9e99, train_update_every=1):
     """
     Performs a training of the model.
 
@@ -51,6 +52,9 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
             Scheduler of how the learning rate is evolving through the epochs. If it
             is None, it does not update the learning rate. It can be a dictionary
             like the optimizer argument. (default: None)
+        dvbatch (int):
+            If differentiable validation applies, it averages the loss by this
+            many before applying the backprop. (default: 1)
         num_epochs (int):
             The number of epochs in training. (default: 25)
         device :
@@ -143,6 +147,10 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
             logps = torch.zeros(len(dataloaders["val"])).to(device)
 
             # every epoch has a training and a validation phase
+            sum_dval_loss = 0.0
+            count_dval = 0
+            optimizer["train"].zero_grad()
+            optimizer["val"].zero_grad()
             for phase in ["train", "val"]:
 
                 # skip phase if the dataloaders for the current phase is empty
@@ -151,6 +159,8 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                 # set the model's mode
                 if scheduler is not None:
                     scheduler[phase].step()
+                    if phase == "val" and "diffval" in scheduler:
+                        scheduler["diffval"].step()
                 model.train()
 
                 # the total loss during this epoch
@@ -162,7 +172,10 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                 # reset the criteria before the training epoch starts
                 criteria[phase].reset()
                 count_i = 0
+                count_train_update = 0
                 for inputs, labels in dataloaders[phase]:
+                    count_train_update += 1
+
                     # get the size of the dataset
                     dataset_size += inputs.size(0)
                     num_batches += 1
@@ -176,8 +189,10 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                     labels = labels.to(device)
 
                     # reset the model gradient to 0
-                    optimizer["train"].zero_grad()
-                    optimizer["val"].zero_grad()
+                    if phase == "val":
+                        optimizer["val"].zero_grad()
+                        if "diffval" in optimizer:
+                            optimizer["diffval"].zero_grad()
 
                     # forward
                     outputs, logp = model(inputs)
@@ -186,12 +201,35 @@ def train(model, dataloaders, criteria, optimizer, scheduler=None,
                     # backward gradient computation and optimize in training
                     if phase == "train":
                         loss.backward()
-                        optimizer[phase].step()
+                        if count_train_update % train_update_every == 0 or \
+                           count_train_update == len(dataloaders[phase]):
+                            optimizer["train"].step()
+                            optimizer["train"].zero_grad()
                     else:
+                        if "diffval" in optimizer:
+                            sum_dval_loss = sum_dval_loss + loss
+                            count_dval += 1
+
+                            # applying the backprop
+                            if count_dval == dvbatch:
+                                mean_dval_loss = sum_dval_loss / count_dval
+                                mean_dval_loss.backward()
+                                optimizer["diffval"].step()
+                                count_dval = 0
+                                sum_dval_loss = 0.0
+
                         # we need the gradient for logp, but not for loss
                         losses[count_i] += loss.data
                         logps[count_i] += logp
-                    count_i += 1
+                        count_i += 1
+
+                # apply backprop if there's still diff validation left
+                if count_dval != 0:
+                    mean_dval_loss = sum_dval_loss / count_dval
+                    mean_dval_loss.backward()
+                    optimizer["diffval"].step()
+                    count_dval = 0
+                    sum_dval_loss = 0.0
 
                 # do the reinforce
                 if phase == "val":
